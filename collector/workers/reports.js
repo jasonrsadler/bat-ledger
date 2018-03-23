@@ -17,7 +17,7 @@ let altcurrency
 
 const datefmt = 'yyyymmdd-HHMMss'
 
-const quanta = async (debug, runtime, qid) => {
+const quanta = async (debug, runtime, qid, qcohorts) => {
   const database = runtime.database
   const database2 = runtime.database2 || database
   const contributions = database2.get('contributions', debug)
@@ -68,12 +68,7 @@ const quanta = async (debug, runtime, qid) => {
     }
   }
 
-  query = {
-    probi: { $gt: 0 },
-    votes: { $gt: 0 },
-    altcurrency: { $eq: altcurrency }
-  }
-  if (qid) query._id = qid
+  query = qparams({ probi: { $gt: 0 }, votes: { $gt: 0 }, altcurrency: { $eq: altcurrency } }, qid, qcohorts)
   results = await contributions.aggregate([
     {
       $match: query
@@ -99,11 +94,7 @@ const quanta = async (debug, runtime, qid) => {
     }
   ])
 
-  query = {
-    counts: { $gt: 0 },
-    exclude: false
-  }
-  if (qid) query._id = qid
+  query = qparams({ counts: { $gt: 0 }, exclude: false }, qid, qcohorts)
   votes = await voting.aggregate([
     {
       $match: query
@@ -129,7 +120,7 @@ const quanta = async (debug, runtime, qid) => {
   }))
 }
 
-const mixer = async (debug, runtime, filter, qid) => {
+const mixer = async (debug, runtime, filter, qid, qcohorts) => {
   const database = runtime.database
   const database2 = runtime.database2 || database
   const publishers = {}
@@ -144,8 +135,7 @@ const mixer = async (debug, runtime, filter, qid) => {
       return previous && previous.dividedBy(1e11).round().equals(current.dividedBy(1e11).round())
     }
 
-    query = { surveyorId: quantum.surveyorId, exclude: false }
-    if (qid) query._id = qid
+    query = qparams({ surveyorId: quantum.surveyorId, exclude: false }, qid, qcohorts)
     slices = await voting.find(query)
     for (let slice of slices) {
       probi = new BigNumber(quantum.quantum.toString()).times(slice.counts).times(0.95)
@@ -187,9 +177,16 @@ const mixer = async (debug, runtime, filter, qid) => {
     }
   }
 
-  results = await quanta(debug, runtime, qid)
+  results = await quanta(debug, runtime, qid, qcohorts)
   for (let result of results) await slicer(result)
   return publishers
+}
+
+const qparams = (query, qid, qcohorts) => {
+  if (qid) query._id = qid
+  if (qcohorts) query.cohort = qcohorts.length > 0 ? { $in: qcohorts } : 'control'
+
+  return query
 }
 
 const publisherCompare = (a, b) => {
@@ -336,6 +333,29 @@ const publisherContributions = (runtime, publishers, authority, authorized, veri
   return { data: data, altcurrency: altcurrency, probi: probi, fees: fees }
 }
 
+const reasonCode = (debug, runtime, reason) => {
+  const codeRE = /Response Error: ([1-5][0-9][0-9])/
+  const reasons = [
+    { code: 1, contains: 'timeout' },
+    { code: 2, contains: 'ECONNREFUSED' },
+    { code: 3, contains: 'redirections' },
+    { code: 4, contains: 'Hostname/IP doesn\'t match certificate\'s altnames' },
+    { code: 5, contains: 'certificate' },
+    { code: 6, contains: 'socket hang up' }
+  ]
+  let match
+
+  if ((!reason) || (reason.indexOf('Error:') === -1)) return 0
+
+  for (let entry of reasons) { if ((entry.contains) && (reason.indexOf(entry.contains) !== -1)) return entry.code }
+
+  match = codeRE.exec(reason)
+  if (match) return parseInt(match[1], 10)
+
+  runtime.notify(debug, { channel: '#collector-bot', text: 'unknown reason: ' + reason })
+  return 999
+}
+
 var exports = {}
 
 exports.initialize = async (debug, runtime) => {
@@ -426,6 +446,7 @@ exports.workers = {
       , summary        :  true  | false
       , threshold      : probi
       , verified       :  true  | false | undefined
+      , cohorts        : [ '...', '...' ... ]
       , amount         : '...'    // ignored (converted to threshold probi)
       , currency       : '...'    //   ..
       }
@@ -437,7 +458,7 @@ exports.workers = {
       const authority = payload.authority
       const authorized = payload.authorized
       const format = payload.format || 'csv'
-      const balanceP = payload.balance
+      const balanceP = payload.balance && !analysisP
       const publisher = payload.publisher
       const reportId = payload.reportId
       const summaryP = payload.summary || analysisP
@@ -454,7 +475,7 @@ exports.workers = {
       const scale = new BigNumber(runtime.currency.alt2scale(altcurrency) || 1)
       let cohorts, data, entries, fields, file, info, previous, publishers, query, results, usd
 
-      publishers = await mixer(debug, runtime, publisher && [ publisher ], undefined)
+      publishers = await mixer(debug, runtime, publisher && [ publisher ], undefined, payload.cohorts || [])
 
       underscore.keys(publishers).forEach((publisher) => {
         publishers[publisher].authorized = false
@@ -558,8 +579,7 @@ exports.workers = {
           for (let entry of plist) {
             let params, props
 
-            params = { timestamp: entry.timestamp }
-            if (entry.reason) params.reason = entry.reason
+            params = { timestamp: entry.timestamp, reason: reasonCode(debug, runtime, entry.reason) }
 
             if (entry.site) {
               underscore.extend(params, { modified: '' }, underscore.omit(entry.site, [ 'publisher' ]))
@@ -571,12 +591,11 @@ exports.workers = {
 
             props = [ 'title', 'softTitle', 'description', 'text' ]
             props.forEach((prop) => {
-              const value = params[prop]
+              let value = params[prop]
 
-              if (!value) return
-
-              if (notAsciiRE.test(value)) params[prop] = 'non-ascii characters (length ' + value.length + ')'
-              else if (value.length > 30) params[prop] = value.substr(0, 20).trim() + '... (length ' + value.length + ')'
+              if (value) value = value.length
+              params[prop + '.length'] = value || 0
+              params[prop + '.ascii'] = value && !notAsciiRE.test(params[prop]) ? 1 : 0
             })
 
             props = [ 'created', 'modified' ]
@@ -668,7 +687,12 @@ exports.workers = {
       ]
       if (cohorts) {
         fields = fields.concat(cohorts, [
-          'epoch', 'title', 'softTitle', 'description', 'text', 'url',
+          'epoch',
+          'title.length', 'title.ascii',
+          'softTitle.length', 'softTitle.ascii',
+          'description.length', 'description.ascii',
+          'text.length', 'text.ascii',
+          'url',
           'comments', 'subscribers', 'videos', 'country',
           'reason'
         ])

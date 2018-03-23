@@ -74,7 +74,7 @@ const gather = async (debug, runtime) => {
 
   events = await pseries.find({ publisher: { $ne: '' } }, { sort: { tsId: -1 }, limit: 1 })
 
-  query = underscore.extend(((events) && (events.length > 0)) ? { _id: { $gt: events[0].tsId } } : {}, { exclude: false })
+  query = (events) && (events.length > 0) ? { _id: { $gt: events[0].tsId } } : {}
   events = await voting.find(query)
 
   query = underscore.omit(query, [ 'counts', 'exclude' ])

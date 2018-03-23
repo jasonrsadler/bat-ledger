@@ -81,7 +81,7 @@ const hourly = async (debug, runtime) => {
   debug('hourly', 'running')
 
   try {
-    await mixer(debug, runtime, undefined, undefined)
+    await mixer(debug, runtime, undefined, undefined, undefined)
   } catch (ex) {
     runtime.captureException(ex)
     debug('hourly', { reason: ex.toString(), stack: ex.stack })
@@ -341,7 +341,7 @@ const sanity = async (debug, runtime) => {
   debug('sanity', 'running again ' + moment(next).fromNow())
 }
 
-const quanta = async (debug, runtime, qid) => {
+const quanta = async (debug, runtime, qid, qcohorts) => {
   const contributions = runtime.database.get('contributions', debug)
   const voting = runtime.database.get('voting', debug)
   let query, results, votes
@@ -389,12 +389,7 @@ const quanta = async (debug, runtime, qid) => {
     }
   }
 
-  query = {
-    probi: { $gt: 0 },
-    votes: { $gt: 0 },
-    altcurrency: { $eq: altcurrency }
-  }
-  if (qid) query._id = qid
+  query = qparams({ probi: { $gt: 0 }, votes: { $gt: 0 }, altcurrency: { $eq: altcurrency } }, qid, qcohorts)
   results = await contributions.aggregate([
     {
       $match: query
@@ -420,11 +415,7 @@ const quanta = async (debug, runtime, qid) => {
     }
   ])
 
-  query = {
-    counts: { $gt: 0 },
-    exclude: false
-  }
-  if (qid) query._id = qid
+  query = qparams({ counts: { $gt: 0 }, exclude: false }, qid, qcohorts)
   votes = await voting.aggregate([
     {
       $match: query
@@ -450,7 +441,7 @@ const quanta = async (debug, runtime, qid) => {
   }))
 }
 
-const mixer = async (debug, runtime, filter, qid) => {
+const mixer = async (debug, runtime, filter, qid, qcohorts) => {
   const publishers = {}
   let results
 
@@ -463,8 +454,7 @@ const mixer = async (debug, runtime, filter, qid) => {
       return previous && previous.dividedBy(1e11).round().equals(current.dividedBy(1e11).round())
     }
 
-    query = { surveyorId: quantum.surveyorId, exclude: false }
-    if (qid) query._id = qid
+    query = qparams({ surveyorId: quantum.surveyorId, exclude: false }, qid, qcohorts)
     slices = await voting.find(query)
     for (let slice of slices) {
       probi = new BigNumber(quantum.quantum.toString()).times(slice.counts).times(0.95)
@@ -491,6 +481,7 @@ const mixer = async (debug, runtime, filter, qid) => {
         cohort: slice.cohort || 'control'
       })
       if (equals(slice.probi && new BigNumber(slice.probi.toString()), probi)) continue
+      console.log('!!! ' + (slice.probi && new BigNumber(slice.probi.toString())) + ' vs. ' + probi)
 
       state = {
         $set: {
@@ -499,13 +490,21 @@ const mixer = async (debug, runtime, filter, qid) => {
           fees: bson.Decimal128.fromString(fees.toString())
         }
       }
-      await voting.update({ surveyorId: quantum.surveyorId, publisher: slice.publisher, cohort: slice.cohort || 'control' }, state, { upsert: true })
+      await voting.update({ surveyorId: quantum.surveyorId, publisher: slice.publisher, cohort: slice.cohort || 'control' },
+                          state, { upsert: true })
     }
   }
 
-  results = await quanta(debug, runtime, qid)
+  results = await quanta(debug, runtime, qid, qcohorts)
   for (let result of results) await slicer(result)
   return publishers
+}
+
+const qparams = (query, qid, qcohorts) => {
+  if (qid) query._id = qid
+  if (qcohorts) query.cohort = qcohorts.length > 0 ? { $in: qcohorts } : 'control'
+
+  return query
 }
 
 const publisherCompare = (a, b) => {
@@ -563,7 +562,7 @@ const labelize = async (debug, runtime, data) => {
 }
 
 const publisherContributions = (runtime, publishers, authority, authorized, verified, format, reportId, summaryP, threshold,
-                              usd) => {
+                                usd) => {
   const scale = new BigNumber(runtime.currency.alt2scale(altcurrency) || 1)
   let data, fees, results, probi
 
@@ -809,6 +808,7 @@ exports.workers = {
       , summary        :  true  | false
       , threshold      : probi
       , verified       :  true  | false | undefined
+      , cohorts        : [ '...', '...' ... ]
       , amount         : '...'    // ignored (converted to threshold probi)
       , currency       : '...'    //   ..
       }
@@ -818,6 +818,7 @@ exports.workers = {
     async (debug, runtime, payload) => {
       const authority = payload.authority
       const authorized = payload.authorized
+      const cohorts = payload.cohorts || []
       const format = payload.format || 'csv'
       const balanceP = payload.balance
       const publisher = payload.publisher
@@ -832,7 +833,7 @@ exports.workers = {
       const scale = new BigNumber(runtime.currency.alt2scale(altcurrency) || 1)
       let data, entries, file, info, previous, publishers, usd
 
-      publishers = await mixer(debug, runtime, publisher && [ publisher ], undefined)
+      publishers = await mixer(debug, runtime, publisher && [ publisher ], undefined, cohorts)
 
       underscore.keys(publishers).forEach((publisher) => {
         publishers[publisher].authorized = false
@@ -1059,7 +1060,7 @@ exports.workers = {
           if (ending) query._id.$lte = date2objectId(ending, true)
         }
         entries = await settlements.find(query)
-        publishers = await mixer(debug, runtime, publisher, query._id)
+        publishers = await mixer(debug, runtime, publisher, query._id, undefined)
       } else {
         entries = await settlements.find(underscore.pick(payload, [ 'owner', 'hash', 'settlementId' ]))
         if ((rollupP) && (entries.length > 0)) {
@@ -1067,7 +1068,7 @@ exports.workers = {
           entries.forEach((entry) => { query.$or.push({ publisher: entry.publisher }) })
           entries = await settlements.find(query)
         }
-        publishers = await mixer(debug, runtime, undefined, undefined)
+        publishers = await mixer(debug, runtime, undefined, undefined, undefined)
         underscore.keys(publishers).forEach((publisher) => {
           if (underscore.where(entries, { publisher: publisher }).length === 0) delete publishers[publisher]
         })
@@ -1417,7 +1418,7 @@ exports.workers = {
           if (mixerP) break
         }
 
-        if (mixerP) await mixer(debug, runtime, undefined, undefined)
+        if (mixerP) await mixer(debug, runtime, undefined, undefined, undefined)
       }
 
       results = []
