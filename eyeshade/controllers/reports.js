@@ -25,9 +25,9 @@ v1.getFile = {
     return async (request, reply) => {
       const debug = braveHapi.debug(module, request)
       const reportId = request.params.reportId
-      let reader, writer
+      let file, reader, writer
 
-      const file = await runtime.database.openFile(reportId)
+      file = await runtime.database.file(reportId, 'r')
       if (!file) return reply(boom.notFound('no such report: ' + reportId))
 
       reader = runtime.database.source({ filename: reportId })
@@ -133,6 +133,7 @@ v1.publishers.contributions = {
       balance: Joi.boolean().optional().default(true).description('show balance due'),
       authorized: Joi.boolean().optional().description('filter on authorization status'),
       verified: Joi.boolean().optional().description('filter on verification status'),
+      cohorts: Joi.array().items(braveJoi.string().token()).description('cohorts to be included in report'),
       amount: Joi.number().integer().min(0).optional().description('the minimum amount in fiat currency'),
       currency: braveJoi.string().currencyCode().optional().default('USD').description('the fiat currency')
     }
@@ -506,7 +507,8 @@ v1.surveyors.contributions = {
     query: {
       format: Joi.string().valid('json', 'csv').optional().default('csv').description('the format of the report'),
       summary: Joi.boolean().optional().default(true).description('summarize report'),
-      excluded: Joi.boolean().optional().default(false).description('include only excluded votes in report')
+      excluded: Joi.boolean().optional().description('filter on excluded status (forces !summary)'),
+      cohorts: Joi.array().items(braveJoi.string().token()).description('cohorts to be included in report')
     }
   },
 

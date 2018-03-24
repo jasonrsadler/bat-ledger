@@ -275,6 +275,7 @@ exports.initialize = async (debug, runtime) => {
      // added by administrator
         exclude: false,
         hash: '',
+        auditors: [],
 
      // added during report runs...
      // v1 only
@@ -286,7 +287,7 @@ exports.initialize = async (debug, runtime) => {
       },
       unique: [ { surveyorId: 1, publisher: 1, cohort: 1 } ],
       others: [ { counts: 1 }, { timestamp: 1 },
-                { exclude: 1 }, { hash: 1 }, { counts: 1 },
+                { exclude: 1 }, { hash: 1 }, { auditors: 1 }, { counts: 1 },
                 { altcurrency: 1, probi: 1 },
                 { altcurrency: 1, exclude: 1, probi: 1 },
                 { owner: 1, altcurrency: 1, exclude: 1, probi: 1 },

@@ -22,7 +22,7 @@ v1.getFile =
     const reportId = request.params.reportId
     let file, reader, writer
 
-    file = await runtime.database.openFile(reportId)
+    file = await runtime.database.file(reportId, 'r')
     if (!file) return reply(boom.notFound('no such report: ' + reportId))
 
     reader = runtime.database.source({ filename: reportId })
@@ -32,14 +32,8 @@ v1.getFile =
     }).on('open', () => {
       debug('getFile open', underscore.pick(file, [ 'contentType', 'metadata' ]))
       writer = reply(new Readable().wrap(reader))
-      if (file.contentType) {
-        console.log('contentType=' + file.contentType)
-        writer = writer.type(file.contentType)
-      }
-      underscore.keys(file.metadata || {}).forEach((header) => {
-        console.log('header= ' + header + ': ' + file.metadata[header])
-        writer = writer.header(header, file.metadata[header])
-      })
+      if (file.contentType) writer = writer.type(file.contentType)
+      underscore.keys(file.metadata || {}).forEach((header) => { writer = writer.header(header, file.metadata[header]) })
     })
   }
 },

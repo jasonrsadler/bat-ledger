@@ -481,7 +481,6 @@ const mixer = async (debug, runtime, filter, qid, qcohorts) => {
         cohort: slice.cohort || 'control'
       })
       if (equals(slice.probi && new BigNumber(slice.probi.toString()), probi)) continue
-      console.log('!!! ' + (slice.probi && new BigNumber(slice.probi.toString())) + ' vs. ' + probi)
 
       state = {
         $set: {
@@ -786,9 +785,13 @@ exports.initialize = async (debug, runtime) => {
   ])
 
   if ((typeof process.env.DYNO === 'undefined') || (process.env.DYNO === 'worker.1')) {
+/*
     setTimeout(() => { daily(debug, runtime) }, 5 * 1000)
+ */
     setTimeout(() => { hourly(debug, runtime) }, 30 * 1000)
+/*
     setTimeout(() => { sanity(debug, runtime) }, 5 * 60 * 1000)
+ */
   }
 }
 
@@ -1368,16 +1371,18 @@ exports.workers = {
       , authority      : '...:...'
       , format         : 'json' | 'csv'
       , summary        :  true  | false
-      , excluded       :  true  | false
+      , cohorts        : [ '...', '...' ... ]
+      , excluded       :  true  | false | undefined
       }
     }
  */
   'report-surveyors-contributions':
     async (debug, runtime, payload) => {
       const authority = payload.authority
+      const cohorts = payload.cohorts || []
       const format = payload.format || 'csv'
-      const summaryP = payload.summary
       const excluded = payload.excluded
+      const summaryP = (typeof excluded !== 'undefined') ? false : payload.summary
       const settlements = runtime.database.get('settlements', debug)
       const voting = runtime.database.get('voting', debug)
       let data, fields, file, mixerP, previous, results, slices, publishers
@@ -1404,7 +1409,7 @@ exports.workers = {
         })
       }
 
-      data = underscore.sortBy(await quanta(debug, runtime, undefined), 'created')
+      data = underscore.sortBy(await quanta(debug, runtime, undefined, cohorts), 'created')
       if (!summaryP) {
         for (let quantum of data) {
           slices = await voting.find({ surveyorId: quantum.surveyorId, exclude: false })
@@ -1418,7 +1423,7 @@ exports.workers = {
           if (mixerP) break
         }
 
-        if (mixerP) await mixer(debug, runtime, undefined, undefined, undefined)
+        if (mixerP) await mixer(debug, runtime, undefined, undefined, cohorts)
       }
 
       results = []
@@ -1432,7 +1437,8 @@ exports.workers = {
         results.push(quantum)
         if (summaryP) continue
 
-        slices = await voting.find({ surveyorId: quantum.surveyorId, exclude: excluded })
+        slices = await voting.find(underscore.extend({ surveyorId: quantum.surveyorId },
+                                                     typeof excluded !== 'undefined' ? { exclude: excluded } : {}))
         slices.forEach((slice) => {
           let probi
 
@@ -1444,8 +1450,7 @@ exports.workers = {
             else {
               probi = probi.minus(slice.probi)
               if (probi.greaterThan(0)) publishers[slice.publisher].probi = probi
-              else if (!excluded) delete publishers[slice.publisher]
-
+              else delete publishers[slice.publisher]
               return
             }
           }

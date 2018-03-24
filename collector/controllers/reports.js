@@ -21,15 +21,14 @@ let altcurrency
 v1.getFile = {
   handler: (runtime) => {
     return async (request, reply) => {
-      const database = runtime.database
       const debug = braveHapi.debug(module, request)
       const reportId = request.params.reportId
-      let reader, writer
+      let file, reader, writer
 
-      const file = await database.file(reportId, 'r')
+      file = await runtime.database.file(reportId, 'r')
       if (!file) return reply(boom.notFound('no such report: ' + reportId))
 
-      reader = database.source({ filename: reportId })
+      reader = runtime.database.source({ filename: reportId })
       reader.on('error', (err) => {
         debug('getFile error', err)
         reply(boom.badImplementation('Sic transit gloria mundi: ' + reportId))
