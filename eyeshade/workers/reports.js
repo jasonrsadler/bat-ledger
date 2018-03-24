@@ -785,13 +785,9 @@ exports.initialize = async (debug, runtime) => {
   ])
 
   if ((typeof process.env.DYNO === 'undefined') || (process.env.DYNO === 'worker.1')) {
-/*
     setTimeout(() => { daily(debug, runtime) }, 5 * 1000)
- */
     setTimeout(() => { hourly(debug, runtime) }, 30 * 1000)
-/*
     setTimeout(() => { sanity(debug, runtime) }, 5 * 60 * 1000)
- */
   }
 }
 
