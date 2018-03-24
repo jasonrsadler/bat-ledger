@@ -343,7 +343,7 @@ const reasonCode = (debug, runtime, reason) => {
     { code: 4, contains: 'Hostname/IP doesn\'t match certificate\'s altnames' },
     { code: 5, contains: 'certificate' },
     { code: 6, contains: 'socket hang up' },
-    { code: 7, contains: 'TypeError' }
+    { code: 7, contains: 'TypeError' },
     { code: 8, contains: 'ENOTFOUND' },
     { code: 9, contains: 'EPROTO' }
   ]
