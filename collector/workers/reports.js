@@ -341,7 +341,11 @@ const reasonCode = (debug, runtime, reason) => {
     { code: 3, contains: 'redirections' },
     { code: 4, contains: 'Hostname/IP doesn\'t match certificate\'s altnames' },
     { code: 5, contains: 'certificate' },
-    { code: 6, contains: 'socket hang up' }
+    { code: 6, contains: 'socket hang up' },
+    { code: 7, contains: 'Time-out' },
+    { code: 8, contains: 'ENOTFOUND' },
+    { code: 9, contains: 'EPROTO' }
+    { code: 10, contains: 'TypeError' }
   ]
   let match
 
@@ -532,8 +536,11 @@ exports.workers = {
       if (analysisP) {
         results = []
 
-        query = { $or: [] }
-        for (let datum of data) { query.$or.push({ publisher: datum.publisher }) }
+        query = {}
+        if ((typeof authorized !== 'undefined') || (typeof verified !== 'undefined') || (threshold > 0)) {
+          query.$or = []
+          for (let datum of data) { query.$or.push({ publisher: datum.publisher }) }
+        }
         entries = await voting.aggregate([
           {
             $match: query
@@ -644,8 +651,8 @@ exports.workers = {
             if ((wallet) && (wallet.address) && (wallet.preferredCurrency)) {
               datum.address = wallet.address
               datum.currency = wallet.preferredCurrency
-            } else {
-/* NOT NEEDED by collector
+            } else if (!analysisP) {
+/* TBD: remove comment when merged into eyeshade...
               await notification(debug, runtime, entry.owner, datum.publisher, { type: 'verified_no_wallet' })
  */
             }
