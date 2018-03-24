@@ -337,15 +337,15 @@ const reasonCode = (debug, runtime, reason) => {
   const codeRE = /Response Error: ([1-5][0-9][0-9])/
   const reasons = [
     { code: 1, contains: 'timeout' },
+    { code: 1, contains: 'Time-out' },
     { code: 2, contains: 'ECONNREFUSED' },
     { code: 3, contains: 'redirections' },
     { code: 4, contains: 'Hostname/IP doesn\'t match certificate\'s altnames' },
     { code: 5, contains: 'certificate' },
     { code: 6, contains: 'socket hang up' },
-    { code: 7, contains: 'Time-out' },
+    { code: 7, contains: 'TypeError' }
     { code: 8, contains: 'ENOTFOUND' },
     { code: 9, contains: 'EPROTO' }
-    { code: 10, contains: 'TypeError' }
   ]
   let match
 
