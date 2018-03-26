@@ -126,6 +126,7 @@ const createPersona = function (runtime, apiVersion) {
     const debug = braveHapi.debug(module, request)
     const uId = request.params.uId.toLowerCase()
     const proof = request.payload.proof
+    console.log(request.payload)
     var response = {}
     const credentials = runtime.database.get('credentials', debug)
     let entry, registrar, state, verification, requestSchema, requestType
@@ -160,7 +161,7 @@ const createPersona = function (runtime, apiVersion) {
         octets: Joi.string().optional().description('octet string that was signed and digested')
       }).required()
     }
-    let validity = Joi.validate(request.payload, requestSchema)
+    let validity = Joi.validate(request.payload.request, requestSchema)
     const error = validity.error
     if (error) return reply(boom.badData(error))
 
