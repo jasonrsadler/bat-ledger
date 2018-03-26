@@ -24,7 +24,6 @@ v2.batBalance =
     const cardId = request.params.cardId
     let fresh = false
     let expireIn = process.env.BALANCE_CACHE_TTL_S || 60 // 1 minute default
-
     let cardInfo = await runtime.cache.get(cardId, 'ledgerBalance:cardInfo')
     if (cardInfo) {
       cardInfo = JSON.parse(cardInfo)
