@@ -160,8 +160,9 @@ const createPersona = function (runtime, apiVersion) {
         octets: Joi.string().optional().description('octet string that was signed and digested')
       }).required()
     }
-    var validity = (Joi.validate(request.payload, requestSchema).error)
-    if (validity.error) return reply(boom.badData(validity.error))
+    let validity = Joi.validate(request.payload, requestSchema)
+    const error = validity.error
+    if (error) return reply(boom.badData(error))
 
     if (requestType === 'httpSignature') {
       const expectedDigest = 'SHA-256=' + crypto.createHash('sha256').update(request.payload.request.octets, 'utf8').digest('base64')
