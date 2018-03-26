@@ -126,7 +126,6 @@ const createPersona = function (runtime, apiVersion) {
     const debug = braveHapi.debug(module, request)
     const uId = request.params.uId.toLowerCase()
     const proof = request.payload.proof
-    console.log(request.payload)
     var response = {}
     const credentials = runtime.database.get('credentials', debug)
     let entry, registrar, state, verification, requestSchema, requestType

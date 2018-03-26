@@ -66,7 +66,7 @@ test('api : v2 contribution workflow with BAT', async t => {
     request: {
       body: body,
       headers: headers,
-      octets: octets
+      octets: octets,
     },
     proof: personaCredential.request()
   }
