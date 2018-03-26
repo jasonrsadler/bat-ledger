@@ -22,7 +22,10 @@ function uint8tohex (arr) {
   return strBuilder.join('')
 }
 
-const snooze = ms => new Promise(resolve => setTimeout(resolve, ms))
+const snooze = ms => {
+  console.log(ms);
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 test('server api : respsonds with ack', async t => {
   const srv = await server
@@ -86,17 +89,17 @@ test('api : v2 contribution workflow with BAT', async t => {
     .expect(ok)
   t.true(response.body.paymentId === paymentId)
 
-  const token = uint8tohex(keypair.secretKey);
-  response = await request(srv.listener)
-    .post('/v2/surveyor/contribution')
-    .send({ 'adFree': {
-      'fee': { 'USD': 5 },
-      'probi': '24123500000000000000',
-      'altcurrency': 'BAT',
-      'votes': 5
-    }})
-    .set('Authorization', `Bearer ${token}`)
-    .expect(ok)
+  // const token = paymentId;
+  // response = await request(srv.listener)
+  //   .post('/v2/surveyor/contribution')
+  //   .send({ 'adFree': {
+  //     'fee': { 'USD': 5 },
+  //     'probi': '24123500000000000000',
+  //     'altcurrency': 'BAT',
+  //     'votes': 5
+  //   }})
+  //   .set('Authorization', `Bearer ${token}`)
+  //   .expect(ok)
 
   response = await request(srv.listener)
     .get('/v2/surveyor/contribution/current/' + personaCredential.parameters.userId)
