@@ -21,15 +21,14 @@ let altcurrency
 v1.getFile = {
   handler: (runtime) => {
     return async (request, reply) => {
-      const database = runtime.database
       const debug = braveHapi.debug(module, request)
       const reportId = request.params.reportId
-      let reader, writer
+      let file, reader, writer
 
-      const file = await database.file(reportId, 'r')
+      file = await runtime.database.file(reportId, 'r')
       if (!file) return reply(boom.notFound('no such report: ' + reportId))
 
-      reader = database.source({ filename: reportId })
+      reader = runtime.database.source({ filename: reportId })
       reader.on('error', (err) => {
         debug('getFile error', err)
         reply(boom.badImplementation('Sic transit gloria mundi: ' + reportId))
@@ -170,9 +169,10 @@ v1.publishers.contributions = {
       format: Joi.string().valid('json', 'csv').optional().default('csv').description('the format of the report'),
       summary: Joi.boolean().optional().default(true).description('summarize report'),
       balance: Joi.boolean().optional().default(true).description('show balance due'),
-      analysis: Joi.boolean().default(true).description('return collector analysis (forces summary)'),
+      analysis: Joi.boolean().default(true).description('return collector analysis (forces summary && !balance)'),
       authorized: Joi.boolean().optional().description('filter on authorization status'),
       verified: Joi.boolean().optional().description('filter on verification status'),
+      cohorts: Joi.array().min(0).items(Joi.string().alphanum()).optional().description('applicable cohorts'),
       amount: Joi.number().integer().min(0).optional().description('the minimum amount in fiat currency'),
       currency: braveJoi.string().currencyCode().optional().default('USD').description('the fiat currency')
     }
