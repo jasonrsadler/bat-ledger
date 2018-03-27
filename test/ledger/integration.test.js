@@ -1,5 +1,4 @@
 'use strict';
-import dotenv from 'dotenv';
 import BigNumber from 'bignumber.js';
 import UpholdSDK from '@uphold/uphold-sdk-javascript';
 import anonize from 'node-anonize2-relic';
@@ -9,11 +8,11 @@ import test from 'ava';
 import tweetnacl from 'tweetnacl';
 import uuid from 'uuid';
 import { sign } from 'http-request-signature';
+import dotenv from 'dotenv';
 dotenv.config();
 
 function ok (res) {
   if (res.status !== 200) {
-    (res.url);
     return new Error(JSON.stringify(res.body, null, 2).replace(/\\n/g, '\n'))
   }
 }
@@ -28,7 +27,7 @@ const snooze = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 // FIXME assert has env vars set and is using uphold
 // NOTE this requires a contibution surveyor to have already been created
-test('integration : v2 contribution workflow with uphold BAT wallet', async t => {
+test.serial('integration : v2 contribution workflow with uphold BAT wallet', async t => {
   const srv = { listener: process.env.BAT_LEDGER_SERVER || 'https://ledger-staging.mercury.basicattentiontoken.org' }
   const personaId = uuid.v4().toLowerCase()
   const viewingId = uuid.v4().toLowerCase()

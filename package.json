@@ -142,7 +142,8 @@
     "nsp": "^3.1.0",
     "standard": "10.0.3",
     "supertest": "^3.0.0",
-    "throng": "4.0.0"
+    "throng": "4.0.0",
+    "validator": "^9.4.1"
   },
   "ava": {
     "require": [

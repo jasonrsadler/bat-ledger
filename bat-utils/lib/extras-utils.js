@@ -20,7 +20,25 @@ exports.utf8ify = (data) => {
 
 exports.requestOk = ({ status, body }) => {
   if (status !== 200) {
+    console.dir(`status: ${status}`, body);
     return new Error(JSON.stringify(body, null, 2).replace(/\\n/g, '\n'));
+  }
+};
+
+exports.errors = {
+//   GRANTSERVER_RUNNING: `Check to make sure that the grant server is running.
+// cd to ~/go/src/github.com/brave-intl/bat-go and run "./grant-server" to make sure it is running.`,
+//   EYESHADE_RUNNING: `Make sure that the eyeshade server is running (npm run start-eyeshade).`,
+//   EYESHADE_WORKER_RUNNING: `Make sure that the eyeshade worker is running (npm run start-eyeshade-worker).`,
+  RUNNING: {
+    EYESHADE: {
+      SERVER: `Make sure that the eyeshade server is running (npm run start-eyeshade).`,
+      WORKER: `Make sure that the eyeshade worker is running (npm run start-eyeshade-worker).`,
+    },
+    GRANT: {
+      SERVER: `Check to make sure that the grant server is running.
+cd to ~/go/src/github.com/brave-intl/bat-go and run "./grant-server"`,
+    }
   }
 };
 

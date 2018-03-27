@@ -495,11 +495,16 @@ v1.surveyors.contributions = {
       const reportId = uuid.v4().toLowerCase()
       const reportURL = url.format(underscore.defaults({ pathname: '/v1/reports/file/' + reportId }, runtime.config.server))
       const debug = braveHapi.debug(module, request)
-
-      await runtime.queue.send(debug, 'report-surveyors-contributions',
-                               underscore.defaults({ reportId: reportId, reportURL: reportURL, authority: authority },
-                                                   request.query))
-      reply({ reportURL: reportURL })
+      const queueData = underscore.defaults({
+        reportId,
+        reportURL,
+        authority
+      }, request.query)
+      await runtime.queue.send(debug, 'report-surveyors-contributions', queueData)
+      reply({
+        reportURL,
+        reportId
+      })
     }
   },
 
