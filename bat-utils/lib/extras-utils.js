@@ -18,12 +18,18 @@ exports.utf8ify = (data) => {
   });
 };
 
-exports.requestOk = ({ status, body }) => {
+exports.requestOk = ({ status, body, request, }) => {
   if (status !== 200) {
-    console.dir(`status: ${status}`, body);
+    console.log(`status: ${status}`);
+    console.log(request.url);
+    console.dir(body);
     return new Error(JSON.stringify(body, null, 2).replace(/\\n/g, '\n'));
   }
 };
+
+exports.uint8tohex = (arr) => {
+  return [].slice.call(arr, []).map(b => ('00' + b.toString(16)).substr(-2)).join('');
+}
 
 exports.errors = {
 //   GRANTSERVER_RUNNING: `Check to make sure that the grant server is running.

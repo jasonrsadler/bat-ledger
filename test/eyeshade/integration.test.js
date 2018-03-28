@@ -1,108 +1,4 @@
-// // get information that a payment occurred
-// // user voted for various publishers (redis)
-// // pulling a report for publishers / surveyors
-// // check math
-// import BigNumber from 'bignumber.js';
-// import UpholdSDK from '@uphold/uphold-sdk-javascript';
-// import anonize from 'node-anonize2-relic';
-// import crypto from 'crypto';
-// import request from 'supertest';
-// import test from 'ava';
-// import tweetnacl from 'tweetnacl';
-// import uuid from 'uuid';
-// import { sign } from 'http-request-signature';
-// import { stringify } from 'querystring';
-// import { extras } from '../../bat-utils';
-// import dotenv from 'dotenv';
-// import { isURL } from 'validator';
-// dotenv.config();
-// const { utils } = extras;
-// const { requestOk, errors, timeout, } = utils;
-// const sharedReportURL = null;
-// const token = 'foobarfoobar';
-// const eyeshadeDomain = process.env.BAT_EYESHADE_SERVER || 'https://eyeshade-staging.mercury.basicattentiontoken.org';
-// // needs
-// const grantServer = process.env.BAT_GRANT_SERVER || 'http://127.0.0.1:3002';
-// test.serial('eyeshade: get json url from eyeshade server', async t => {
-//   t.plan(1);
-//   let reportURL = null;
-//   try {
-//     const url = formContributionsURL();
-//     let body = await eyeshadeGET({
-//       url,
-//     });
-//     reportURL = body.reportURL;
-//   } catch (e) {
-//     console.error(
-//       errors.RUNNING.GRANT.SERVER,
-//       errors.RUNNING.EYESHADE.SERVER,
-//       e);
-//     throw e;
-//   }
-//   const isValidUri = isURL(reportURL);
-//   t.true(isValidUri);
-// });
-// test.serial('eyeshade: get json data from completed report creation', async t => {
-//   t.plan(1);
-//   let result = null;
-//   let tryagain = null;
-//   let url = formContributionsURL();
-//   let { reportId, reportURL, } = await eyeshadeGET({
-//     url,
-//   });
-//   let pathname = `/v1/reports/file/${reportId}`;
-//   console.log(reportURL)
-//   do {
-//     await timeout(5000);
-//     try {
-//       tryagain = false;
-//       result = await eyeshadeGET({
-//         url: pathname,
-//       });
-//     } catch (e) {
-//       tryagain = result.status === 404;
-//       console.log(tryagain, result.status);
-//       if (!tryagain) {
-//         throw tryagain;
-//       }
-//     }
-//   } while (tryagain);
-//   console.log(result);
-//   // const head = json[0];
-//   // const body = json.slice(1);
-//   t.true(true);
-// });
-// // write an abstraction for the do while loops
-// // async function tryAfterMany(theDoBlock) {
-// //   let tryagain = null;
-// //   do {
-// //     tryagain = false;
-// //     try {
-// //       result = await theDoBlock();
-// //     } catch (e) {
-// //       //
-// //     }
-// //   } while (tryagain);
-// // }
 
-// function formContributionsURL() {
-//   const params = stringify({
-//     // format: 'csv',
-//     summary: false,
-//     excluded: false,
-//   });
-//   return `/v1/reports/surveyors/contributions?${params}`;
-// }
-
-// async function eyeshadeGET({ url, domain, }) {
-//   const host = domain || eyeshadeDomain;
-//   const authorization = `Bearer ${token}`;
-//   const response = await request(host)
-//     .get(url)
-//     .set('Authorization', authorization)
-//     .expect(requestOk)
-//   return response.body;
-// }
 // get information that a payment occurred
 // user voted for various publishers (redis)
 // pulling a report for publishers / surveyors
@@ -190,9 +86,10 @@ test.serial('eyeshade: get json data from completed report creation', async t =>
   } = jsonFirst;
   const scopedProbiNumber = +scopedProbi;
   const totalRatio = totalProbi / totalCounts;
-  const scopedCounts = scopedCountsWithoutFee * (1 / 1.05);
+  const scopedCounts = scopedCountsWithoutFee / (1 / 0.95);
   const computedProbi = totalRatio * scopedCounts;
   const ratio = computedProbi / scopedProbiNumber;
+  console.log(ratio, computedProbi, scopedProbiNumber)
   t.true(ratio > 1 && ratio < 1.001);
 });
 // write an abstraction for the do while loops

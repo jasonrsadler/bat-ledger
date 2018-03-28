@@ -8,22 +8,15 @@ import test from 'ava';
 import tweetnacl from 'tweetnacl';
 import uuid from 'uuid';
 import { sign } from 'http-request-signature';
+import { extras } from '../../bat-utils';
 import dotenv from 'dotenv';
 dotenv.config();
-
-function ok (res) {
-  if (res.status !== 200) {
-    return new Error(JSON.stringify(res.body, null, 2).replace(/\\n/g, '\n'))
-  }
-}
-
-function uint8tohex (arr) {
-  var strBuilder = []
-  arr.forEach(function (b) { strBuilder.push(('00' + b.toString(16)).substr(-2)) })
-  return strBuilder.join('')
-}
-
-const snooze = ms => new Promise(resolve => setTimeout(resolve, ms))
+const { utils } = extras;
+const {
+  requestOk: ok,
+  timeout,
+  uint8tohex,
+} = utils;
 
 // FIXME assert has env vars set and is using uphold
 // NOTE this requires a contibution surveyor to have already been created
@@ -59,7 +52,8 @@ test.serial('integration : v2 contribution workflow with uphold BAT wallet', asy
     secretKey: uint8tohex(keypair.secretKey)
   }, { algorithm: 'ed25519' })
 
-  var payload = { requestType: 'httpSignature',
+  var payload = {
+    requestType: 'httpSignature',
     request: {
       body: body,
       headers: headers,
@@ -83,7 +77,6 @@ test.serial('integration : v2 contribution workflow with uphold BAT wallet', asy
   const userCardId = response.body.wallet.addresses.CARD_ID
 
   personaCredential.finalize(response.body.verification)
-
   response = await request(srv.listener).get('/v2/wallet?publicKey=' + uint8tohex(keypair.publicKey))
     .expect(ok)
   t.true(response.body.paymentId === paymentId)
@@ -103,7 +96,7 @@ test.serial('integration : v2 contribution workflow with uphold BAT wallet', asy
   do { // This depends on currency conversion rates being available, retry until then are available
     response = await request(srv.listener)
       .get('/v2/wallet/' + paymentId + '?refresh=true&amount=1&currency=USD')
-    if (response.status === 503) await snooze(response.headers['retry-after'] * 1000)
+    if (response.status === 503) await timeout(response.headers['retry-after'] * 1000)
   } while (response.status === 503)
   var err = ok(response)
   if (err) throw err
@@ -118,7 +111,6 @@ test.serial('integration : v2 contribution workflow with uphold BAT wallet', asy
     'sandbox': 'https://api-sandbox.uphold.com'
   }
   const environment = process.env.UPHOLD_ENVIRONMENT || 'sandbox'
-
   const uphold = new UpholdSDK({ // eslint-disable-line new-cap
     baseUrl: upholdBaseUrls[environment],
     clientId: 'none',
@@ -136,8 +128,8 @@ test.serial('integration : v2 contribution workflow with uphold BAT wallet', asy
   do {
     response = await request(srv.listener)
       .get(`/v2/wallet/${paymentId}?refresh=true&amount=${desired}&altcurrency=BAT`)
-    if (response.status === 503) await snooze(response.headers['retry-after'] * 1000)
-    else if (response.body.balance === '0.0000') await snooze(500)
+    if (response.status === 503) await timeout(response.headers['retry-after'] * 1000)
+    else if (response.body.balance === '0.0000') await timeout(500)
   } while (response.status === 503 || response.body.balance === '0.0000')
   err = ok(response)
   if (err) throw err
@@ -174,7 +166,7 @@ test.serial('integration : v2 contribution workflow with uphold BAT wallet', asy
 
   do { // Contribution surveyor creation is handled asynchonously, this API will return 503 until ready
     if (response.status === 503) {
-      await snooze(response.headers['retry-after'] * 1000)
+      await timeout(response.headers['retry-after'] * 1000)
     }
     response = await request(srv.listener)
       .put('/v2/wallet/' + paymentId)
@@ -195,7 +187,7 @@ test.serial('integration : v2 contribution workflow with uphold BAT wallet', asy
 
   do { // Contribution surveyor creation is handled asynchonously, this API will return 503 until ready
     if (response.status === 503) {
-      await snooze(response.headers['retry-after'] * 1000)
+      await timeout(response.headers['retry-after'] * 1000)
     }
     response = await request(srv.listener)
       .post('/v2/registrar/viewing/' + viewingCredential.parameters.userId)
@@ -203,7 +195,6 @@ test.serial('integration : v2 contribution workflow with uphold BAT wallet', asy
   } while (response.status === 503)
   err = ok(response)
   if (err) throw err
-
   t.true(response.body.hasOwnProperty('surveyorIds'))
   const surveyorIds = response.body.surveyorIds
   t.true(surveyorIds.length >= 5)
@@ -211,18 +202,21 @@ test.serial('integration : v2 contribution workflow with uphold BAT wallet', asy
   viewingCredential.finalize(response.body.verification)
 
   const votes = ['wikipedia.org', 'reddit.com', 'youtube.com', 'ycombinator.com', 'google.com']
-  for (var i = 0; i < surveyorIds.length; i++) {
-    const id = surveyorIds[i]
-    response = await request(srv.listener)
+  await Promise.all(surveyorIds.map((id, i) => {
+    return request(srv.listener)
       .get('/v2/surveyor/voting/' + encodeURIComponent(id) + '/' + viewingCredential.parameters.userId)
-      .expect(ok)
-
-    const surveyor = new anonize.Surveyor(response.body)
-    response = await request(srv.listener)
-      .put('/v2/surveyor/voting/' + encodeURIComponent(id))
-      .send({'proof': viewingCredential.submit(surveyor, { publisher: votes[i % votes.length] })})
-      .expect(ok)
-  }
+      .expect(ok).then(response => {
+        const surveyor = new anonize.Surveyor(response.body)
+        const publisher = votes[i % votes.length];
+        const proof = viewingCredential.submit(surveyor, {
+          publisher,
+        })
+        return request(srv.listener)
+          .put('/v2/surveyor/voting/' + encodeURIComponent(id))
+          .send({ proof, })
+          .expect(ok)
+      })
+  }));
 })
 
 test('integration : v2 grant contribution workflow with uphold BAT wallet', async t => {
@@ -257,7 +251,8 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
     secretKey: uint8tohex(keypair.secretKey)
   }, { algorithm: 'ed25519' })
 
-  var payload = { requestType: 'httpSignature',
+  var payload = {
+    requestType: 'httpSignature',
     request: {
       body: body,
       headers: headers,
@@ -265,6 +260,7 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
     },
     proof: personaCredential.request()
   }
+
   response = await request(srv.listener).post('/v2/registrar/persona/' + personaCredential.parameters.userId)
     .send(payload).expect(ok)
   t.true(response.body.hasOwnProperty('wallet'))
@@ -292,7 +288,6 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
   t.true(response.body.payload.hasOwnProperty('adFree'))
   t.true(response.body.payload.adFree.hasOwnProperty('probi'))
   // const donateAmt = new BigNumber(response.body.payload.adFree.probi).dividedBy('1e18').toNumber()
-
   // get available grant
   response = await request(srv.listener)
     .get('/v1/grants')
@@ -307,7 +302,6 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
       .put(`/v1/grants/${paymentId}`)
       .send({'promotionId': promotionId})
       .expect(ok)
-  console.log(response.body)
   t.true(response.body.hasOwnProperty('probi'))
 
   const donateAmt = new BigNumber(response.body.probi).dividedBy('1e18').toNumber()
@@ -322,8 +316,8 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
   do {
     response = await request(srv.listener)
       .get(`/v2/wallet/${paymentId}?refresh=true&amount=${desired}&altcurrency=BAT`)
-    if (response.status === 503) await snooze(response.headers['retry-after'] * 1000)
-    else if (response.body.balance === '0.0000') await snooze(500)
+    if (response.status === 503) await timeout(response.headers['retry-after'] * 1000)
+    else if (response.body.balance === '0.0000') await timeout(500)
   } while (response.status === 503 || response.body.balance === '0.0000')
   var err = ok(response)
   if (err) throw err
@@ -353,7 +347,7 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
 
   do { // Contribution surveyor creation is handled asynchonously, this API will return 503 until ready
     if (response.status === 503) {
-      await snooze(response.headers['retry-after'] * 1000)
+      await timeout(response.headers['retry-after'] * 1000)
     }
     response = await request(srv.listener)
       .put('/v2/wallet/' + paymentId)
@@ -375,7 +369,7 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
 
   do { // Contribution surveyor creation is handled asynchonously, this API will return 503 until ready
     if (response.status === 503) {
-      await snooze(response.headers['retry-after'] * 1000)
+      await timeout(response.headers['retry-after'] * 1000)
     }
     response = await request(srv.listener)
       .post('/v2/registrar/viewing/' + viewingCredential.parameters.userId)

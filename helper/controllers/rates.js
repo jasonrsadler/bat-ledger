@@ -11,7 +11,16 @@ const v1 = {}
 
 v1.read = { handler: (runtime) => {
   return async (request, reply) => {
-    reply({ altrates: runtime.currency.altrates, fxrates: runtime.currency.fxrates, rates: runtime.currency.rates })
+    const {
+      altrates,
+      fxrates,
+      rates,
+    } = runtime.currency;
+    reply({
+      altrates,
+      fxrates,
+      rates,
+    })
   }
 },
 
@@ -23,7 +32,9 @@ v1.read = { handler: (runtime) => {
   description: 'Report currency rates',
   tags: [ 'api' ],
 
-  validate: { headers: Joi.object({ authorization: Joi.string().required() }).unknown() },
+  validate: {
+    headers: Joi.object({ authorization: Joi.string().required() }).unknown()
+  },
 
   response: { schema: Joi.any().description('all the rates') }
 }
