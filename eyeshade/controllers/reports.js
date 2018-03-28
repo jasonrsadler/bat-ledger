@@ -62,16 +62,35 @@ v3.publishers = {}
 v1.publisher.contributions = {
   handler: (runtime) => {
     return async (request, reply) => {
-      // const authority = request.auth.credentials.provider + ':' + request.auth.credentials.profile.username
+      const { config, queue, } = runtime;
+      // get the authority and use a default
       let authority = authorityProvider(request);
+      // get params and query
+      const { params, query, } = request;
+      // create a new id
       const reportId = uuid.v4().toLowerCase()
-      const reportURL = url.format(underscore.defaults({ pathname: '/v1/reports/file/' + reportId }, runtime.config.server))
+      // create the path to said id
+      const pathname = '/v1/reports/file/' + reportId;
+      // create a url object to be stringified
+      const urlObject = underscore.defaults({
+        pathname,
+      }, config.server);
+      // create a report url
+      const reportURL = url.format(urlObject)
+      // success data queue
+      const sendData = underscore.defaults({
+        reportId,
+        reportURL,
+        authority
+      }, params, query)
+      // start debug block
       const debug = braveHapi.debug(module, request)
-
-      await runtime.queue.send(debug, 'report-publishers-contributions',
-                               underscore.defaults({ reportId: reportId, reportURL: reportURL, authority: authority },
-                                                   request.params, request.query))
-      reply({ reportURL: reportURL })
+      await queue.send(debug, 'report-publishers-contributions', sendData)
+      // reply with url and id
+      reply({
+        reportURL,
+        reportId,
+      })
     }
   },
 
@@ -102,19 +121,43 @@ v1.publisher.contributions = {
 v1.publishers.contributions = {
   handler: (runtime) => {
     return async (request, reply) => {
-      const amount = request.query.amount
-      // const authority = request.auth.credentials.provider + ':' + request.auth.credentials.profile.username
-      const authority = authorityProvider(request);
-      const currency = request.query.currency.toUpperCase()
+      const {
+        queue,
+        currency: runtimeCurrency,
+      } = runtime;
+      const { query, } = request
+      const {
+        amount,
+        currency: queryCurrency,
+      } = query
+      // get the authority and use a default
+      const authority = authorityProvider(request)
+      const currency = queryCurrency.toUpperCase()
+      // create a new id
       const reportId = uuid.v4().toLowerCase()
-      const reportURL = url.format(underscore.defaults({ pathname: '/v1/reports/file/' + reportId }, runtime.config.server))
+      const pathname = `/v1/reports/file/${reportId}`
+      // create the url object
+      const urlObject = underscore.defaults({
+        pathname,
+      }, runtime.config.server);
+      // create the full url
+      const reportURL = url.format(urlObject)
+      // start debug
       const debug = braveHapi.debug(module, request)
-      const threshold = runtime.currency.fiat2alt(currency, amount, altcurrency)
-
-      await runtime.queue.send(debug, 'report-publishers-contributions',
-                               underscore.defaults({ reportId: reportId, reportURL: reportURL, authority: authority },
-                                                   { threshold: threshold }, request.query))
-      reply({ reportURL: reportURL })
+      const threshold = runtimeCurrency.fiat2alt(currency, amount, altcurrency)
+      const queueData = underscore.defaults({
+        reportId,
+        reportURL,
+        authority,
+        threshold,
+      }, query)
+      // send to the queue to be processed
+      await queue.send(debug, 'report-publishers-contributions', queueData)
+      // send back to the request
+      reply({
+        reportURL,
+        reportId,
+      })
     }
   },
 

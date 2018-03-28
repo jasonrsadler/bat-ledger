@@ -24,7 +24,7 @@ const v1 = {}
 const v2 = {}
 
 const qalist = { addresses: process.env.IP_QA_WHITELIST && process.env.IP_QA_WHITELIST.split(',') }
-
+const { CLAIM_RATE_DISABLED, } = process.env;
 const claimRate = {
   limit: 10,
   window: 24 * 60 * 60
@@ -35,7 +35,9 @@ if (qalist.addresses) {
   qalist.authorizedBlocks = []
 
   qalist.addresses.forEach((entry) => {
-    if ((entry.indexOf('/') === -1) && (entry.split('.').length === 4)) return qalist.authorizedAddrs.push(entry)
+    if ((entry.indexOf('/') === -1) && (entry.split('.').length === 4)) {
+      return qalist.authorizedAddrs.push(entry)
+    }
 
     qalist.authorizedBlocks.push(new Netmask(entry))
   })
@@ -43,9 +45,10 @@ if (qalist.addresses) {
 
 const qaOnlyP = (request) => {
   const ipaddr = whitelist.ipaddr(request)
-
-  return (qalist.authorizedAddrs) && (qalist.authorizedAddrs.indexOf(ipaddr) === -1) &&
-    (!underscore.find(qalist.authorizedBlocks, (block) => { return block.contains(ipaddr) }))
+  const { authorizedAddrs, } = qalist;
+  return authorizedAddrs &&
+    (authorizedAddrs.indexOf(ipaddr) === -1) &&
+    (!underscore.find(qalist.authorizedBlocks, block => block.contains(ipaddr)))
 }
 
 /*
@@ -92,16 +95,20 @@ const localeRegExp = /((([a-zA-Z]+(-[a-zA-Z0-9]+){0,2})|\*)(;q=[0-1](\.[0-9]+)?)
 
 v1.read = { handler: (runtime) => {
   return async (request, reply) => {
+    let candidates, entries, priority, promotion, promotionIds;
+    const debug = braveHapi.debug(module, request)
+    // get the query params
     const lang = request.query.lang
     const paymentId = request.query.paymentId
     const languages = l10nparser.parse(lang)
+    // any active promotion that is 1 or more
     const query = { active: true, count: { $gt: 0 } }
-    const debug = braveHapi.debug(module, request)
+    // get the wallets and promotions collections
     const wallets = runtime.database.get('wallets', debug)
     const promotions = runtime.database.get('promotions', debug)
-    let candidates, entries, priority, promotion, promotionIds
 
     const l10n = (o) => {
+      // known labels
       const labels = [ 'greeting', 'message', 'text' ]
 
       for (let key in o) {
@@ -276,9 +283,9 @@ v1.write = { handler: (runtime) => {
 
   plugins: {
     rateLimit: {
-      enabled: true,
-      rate: (request) => claimRate
-    }
+      enabled: !CLAIM_RATE_DISABLED,
+      rate: (request) => claimRate,
+    },
   },
 
   validate: {
