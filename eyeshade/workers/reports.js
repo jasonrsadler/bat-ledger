@@ -94,79 +94,156 @@ const hourly = async (debug, runtime) => {
 }
 
 const sanity = async (debug, runtime) => {
-  const owners = runtime.database.get('owners', debug)
-  const publishers = runtime.database.get('publishers', debug)
-  const scratchpad = runtime.database.get('scratchpad', debug)
-  const tokens = runtime.database.get('tokens', debug)
   let collections, entries, info, next, now, page, results
-
+  const { database, config, common, } = runtime;
+  // get the db collections
+  const owners = database.get('owners', debug)
+  const publishers = database.get('publishers', debug)
+  const scratchpad = database.get('scratchpad', debug)
+  const tokens = database.get('tokens', debug)
+  // start debug block
   debug('sanity', 'running')
 
   try {
-    if (!runtime.config.publishers) throw new Error('no configuration for publishers server')
-
-    await scratchpad.remove({}, { justOne: false })
-
+    // if no publisher configuration
+    if (!config.publishers) throw new Error('no configuration for publishers server')
+    // remove many from the scratchpad
+    await scratchpad.remove({}, {
+      justOne: false,
+    })
+    // publish one page at a time
     page = 0
+    // iterate until a break
     while (true) {
-      entries = await runtime.common.publish(debug, runtime, 'get', null, null, '/owners/?page=' + page + '&per_page=1024')
+      let publishpath = '/owners/?page=' + page + '&per_page=1024'
+      entries = await common.publish(debug, runtime, 'get', null, null, publishpath)
       page++
+      // if no entries break
       if (entries.length === 0) break
-
+      // check all of the entries that were published
       for (let entry of entries) {
         const ownerId = entry.owner_identifier
         let owner, params, props, state
-
+        // get the props
         props = getPublisherProps(ownerId)
         if (!props) {
-          debug('sanity', { message: 'invalid owner', owner: ownerId })
+          debug('sanity', {
+            message: 'invalid owner',
+            owner: ownerId,
+          })
           continue
         }
-
-        await scratchpad.update({ owner: ownerId }, { $set: { seen: true } }, { upsert: true })
+        // set the scratchpad as seen
+        await scratchpad.update({
+          owner: ownerId,
+        }, {
+          $set: { seen: true, },
+        }, {
+          upsert: true,
+        })
 
         state = {
-          $currentDate: { timestamp: { $type: 'timestamp' } },
-          $set: {}
+          $currentDate: {
+            timestamp: { $type: 'timestamp' },
+          },
+          // start with an empty object to be filled up
+          $set: {},
         }
-
-        owner = await owners.findOne({ owner: ownerId })
+        // get the owner that matches the entry's owner_identifier
+        owner = await owners.findOne({
+          owner: ownerId
+        })
+        // if not found, just make a baseline one
         if (!owner) {
+          // create an empty owner
           owner = {}
-
+          // set some state
           underscore.extend(state.$set, {
             visible: entry.show_verification_status || false,
-            altcurrency: altcurrency
-          }, underscore.pick(props, [ 'providerName', 'providerSuffix', 'providerValue' ]))
+            altcurrency: altcurrency,
+          }, underscore.pick(props, [
+            'providerName', 'providerSuffix', 'providerValue'
+          ]))
         }
-        params = underscore.pick(owner, [ 'info', 'visible', 'provider' ])
-
-        info = underscore.pick(entry, [ 'name', 'email' ])
-        if (entry.phone_normalized) info.phone = entry.phone_normalized
-        underscore.extend(state.$set, { info: info, visible: entry.show_verification_status || false })
+        // get info from the owner
+        params = underscore.pick(owner, [
+          'info', 'visible', 'provider'
+        ])
+        // get the name and email from the entry
+        info = underscore.pick(entry, [
+          'name', 'email'
+        ])
+        // use the normalized phone number
+        if (entry.phone_normalized) {
+          info.phone = entry.phone_normalized
+        }
+        // set the state set with info and visible
+        underscore.extend(state.$set, {
+          info: info,
+          visible: entry.show_verification_status || false,
+        })
+        // if uphold is verified use it as the provider
         if (entry.uphold_verified) {
           state.$set.provider = 'uphold'
         } else {
-          state.$unset = { provider: '' }
-        }
-        if (!underscore.isEqual(params, state.$set)) {
-          debug('sanity', { message: 'update', owner: ownerId })
-          params = state.$set
-          await owners.update({ owner: ownerId }, state, { upsert: true })
-        }
-
-        if (!entry.channel_identifiers) entry.channel_identifiers = []
-        results = await publishers.find({ owner: ownerId })
-        for (let result of results) {
-          if (entry.channel_identifiers.indexOf(result.publisher) !== -1) continue
-
-          debug('sanity', { message: 'unlink', owner: ownerId, publisher: result.publisher })
-          state = {
-            $currentDate: { timestamp: { $type: 'timestamp' } },
-            $set: { verified: false, visible: false },
-            $unset: { authority: '', owner: '' }
+          // otherwise unset the provider
+          state.$unset = {
+            provider: '',
           }
-          await publishers.update({ publisher: result.publisher }, state, { upsert: true })
+        }
+        // if the update is not what currently is
+        // (info, visible, provider)
+        // then update the state in the owner's collection
+        if (!underscore.isEqual(params, state.$set)) {
+          debug('sanity', {
+            message: 'update',
+            owner: ownerId,
+          })
+          params = state.$set
+          await owners.update({
+            owner: ownerId,
+          }, state, {
+            upsert: true,
+          })
+        }
+        // reset the channel identifiers if not set
+        if (!entry.channel_identifiers) {
+          entry.channel_identifiers = []
+        }
+        // find the publishers that belong to the owner
+        results = await publishers.find({
+          owner: ownerId,
+        })
+        // iterate through the publishers
+        for (let result of results) {
+          // if not found in the channel identifiers go to next publisher
+          if (entry.channel_identifiers.indexOf(result.publisher) !== -1) continue
+          // unlinked owner from publisher
+          debug('sanity', {
+            message: 'unlink',
+            owner: ownerId,
+            publisher: result.publisher,
+          })
+          // state to be set in the publishers
+          state = {
+            $currentDate: {
+              timestamp: { $type: 'timestamp', },
+            },
+            $set: {
+              verified: false,
+              visible: false,
+            },
+            $unset: {
+              authority: '',
+              owner: '',
+            }
+          }
+          // update or insert the publisher if it doesn't exist
+          await publishers.update({
+            publisher: result.publisher,
+          }, state, {
+            upsert: true,
+          })
         }
 
         for (let channelId of entry.channel_identifiers) {
@@ -174,39 +251,79 @@ const sanity = async (debug, runtime) => {
 
           props = getPublisherProps(channelId)
           if (!props) {
-            debug('sanity', { message: 'invalid publisher', owner: ownerId, publisher: channelId })
+            // if no props notify of invalid publisher
+            debug('sanity', {
+              message: 'invalid publisher',
+              owner: ownerId,
+              publisher: channelId,
+            })
             continue
           }
-
-          await scratchpad.update({ publisher: channelId }, { $set: { seen: true } }, { upsert: true })
-
-          publisher = await publishers.findOne({ publisher: channelId })
-          if ((publisher) && (publisher.owner !== ownerId)) {
+          // update the scratchpad that matches the channel id
+          // insert if it doesn't exist
+          await scratchpad.update({
+            publisher: channelId,
+          }, {
+            $set: { seen: true, },
+          }, {
+            upsert: true,
+          })
+          // get the publisher that was just set to seen
+          publisher = await publishers.findOne({
+            publisher: channelId,
+          })
+          if ((publisher) && (publisher.owner !== ownerId)) { // update the owner if it doesn't match
             debug('sanity', { message: 'reassign', previous: publisher.owner || 'none', owner: ownerId, publisher: channelId })
-
             state = {
-              $currentDate: { timestamp: { $type: 'timestamp' } },
-              $set: { authority: ownerId, verified: true, owner: ownerId }
+              $currentDate: {
+                timestamp: { $type: 'timestamp', },
+              },
+              $set: {
+                authority: ownerId,
+                verified: true,
+                owner: ownerId,
+              }
             }
-          } else if (publisher) {
-            if ((publisher.authority === ownerId) && (publisher.verified === true)) continue
+          } else if (publisher) { // validate publisher data
+            if ((publisher.authority === ownerId) && (publisher.verified === true)) { // go to next
+              continue
+            }
 
             debug('sanity', { message: 'update', publisher: channelId })
             state = {
-              $currentDate: { timestamp: { $type: 'timestamp' } },
-              $set: { authority: ownerId, verified: true }
+              $currentDate: {
+                timestamp: { $type: 'timestamp', },
+              },
+              $set: {
+                authority: ownerId,
+                verified: true,
+              }
             }
-          } else {
-            debug('sanity', { message: 'create', publisher: channelId })
+          } else { // otherwise, there was no publisher found, so create state from given data
+            debug('sanity', {
+              message: 'create',
+              publisher: channelId,
+            })
             state = {
-              $currentDate: { timestamp: { $type: 'timestamp' } },
-              $set: { authority: ownerId, verified: true, visible: params.visible, owner: ownerId, altcurrency: altcurrency }
+              $currentDate: {
+                timestamp: { $type: 'timestamp', },
+              },
+              $set: {
+                authority: ownerId,
+                verified: true,
+                visible: params.visible,
+                owner: ownerId,
+                altcurrency: altcurrency,
+              },
             }
-            underscore.extend(state.$set, underscore.pick(props, [ 'providerName', 'providerSuffix', 'providerValue' ]))
+            // set state props from publisher props
+            underscore.extend(state.$set, underscore.pick(props, [
+              'providerName', 'providerSuffix', 'providerValue'
+            ]))
           }
           if (info.name) state.$set.authorizerName = info.name
           if (info.email) state.$set.authorizerEmail = info.email
-          if (info.email) state.$set.authorizerPhone = info.phone
+          if (info.phone) state.$set.authorizerPhone = info.phone
 
           await publishers.update({ publisher: channelId }, state, { upsert: true })
         }
@@ -302,7 +419,7 @@ const sanity = async (debug, runtime) => {
       let empties = []
       let misses = []
 
-      entries = await runtime.database.get(collection, debug).find()
+      entries = await database.get(collection, debug).find()
       for (let entry of entries) {
         let match
 
