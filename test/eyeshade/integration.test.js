@@ -83,9 +83,10 @@ test('eyeshade: get json data from eyeshade server', async t => {
   const { reportURL, reportId, } = body;
   const response = await fetchReport(reportId)
   const {
-    body: responseBody,
+    body: reportBody,
   } = response;
-  const isArray = Array.isArray(responseBody)
+  console.log('here', reportBody)
+  const isArray = Array.isArray(reportBody)
   t.true(isArray)
 })
 
