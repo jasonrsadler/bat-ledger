@@ -99,7 +99,7 @@ const services = {
 
     f: () => {
       if (!process.env.POSTGRES_URI) {
-        parts = {
+        var parts = {
           protocol: 'postgresql:',
           slashes: true,
           auth: process.env.PGUSER                              || process.env.USER,
