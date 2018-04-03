@@ -102,7 +102,7 @@ exports.initialize = async (debug, runtime) => {
       unique: [ { owner: 1 } ],
       others: [ { providerName: 1 }, { providerSuffix: 1 }, { providerValue: 1 }, { visible: 1 },
                 { authorized: 1 }, { authority: 1 },
-                { provider: 1 }, { altcurrency: 1 }, { parameters: 1 },
+                { provider: 1 }, { altcurrency: 1 }, { parameters: 1 }, { preferredCurrency: 1 },
                 { timestamp: 1 } ]
     },
 
@@ -153,6 +153,25 @@ exports.initialize = async (debug, runtime) => {
       empty: { publisher: '', facet: '', exclude: false, tags: [], timestamp: bson.Timestamp.ZERO },
       unique: [ { publisher: 1 } ],
       others: [ { facet: 1 }, { exclude: 1 }, { timestamp: 1 } ]
+    },
+
+    {
+      category: runtime.database.get('referrals', debug),
+      name: 'referrals',
+      property: 'downloadId',
+      empty: {
+        downloadId: '',
+
+        transactionId: '',
+        publisher: '',
+        platform: '',
+        finalized: bson.Timestamp.ZERO,
+
+        timestamp: bson.Timestamp.ZERO
+      },
+      unique: [ { downloadId: 1 } ],
+      others: [ { transactionId: 1 }, { publisher: 1 }, { finalized: 1 },
+                { timestamp: 1 } ]
     },
 
     {
