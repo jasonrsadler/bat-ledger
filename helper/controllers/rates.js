@@ -14,12 +14,12 @@ v1.read = { handler: (runtime) => {
     const {
       altrates,
       fxrates,
-      rates,
-    } = runtime.currency;
+      rates
+    } = runtime.currency
     reply({
       altrates,
       fxrates,
-      rates,
+      rates
     })
   }
 },
@@ -33,10 +33,14 @@ v1.read = { handler: (runtime) => {
   tags: [ 'api' ],
 
   validate: {
-    headers: Joi.object({ authorization: Joi.string().required() }).unknown()
+    headers: Joi.object({
+      authorization: Joi.string().required()
+    }).unknown()
   },
 
-  response: { schema: Joi.any().description('all the rates') }
+  response: {
+    schema: Joi.any().description('all the rates')
+  }
 }
 
 module.exports.routes = [

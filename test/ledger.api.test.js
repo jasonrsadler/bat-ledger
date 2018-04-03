@@ -7,9 +7,9 @@ import test from 'ava'
 import tweetnacl from 'tweetnacl'
 import uuid from 'uuid'
 import { sign } from 'http-request-signature'
-import dotenv from 'dotenv';
+import dotenv from 'dotenv'
 import server from '../ledger/server'
-dotenv.config();
+dotenv.config()
 function ok (res) {
   if (res.status !== 200) {
     return new Error(JSON.stringify(res.body, null, 2).replace(/\\n/g, '\n'))
@@ -23,7 +23,7 @@ function uint8tohex (arr) {
 }
 
 const snooze = ms => {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise(resolve => setTimeout(resolve, ms))
 }
 
 test('server api : respsonds with ack', async t => {

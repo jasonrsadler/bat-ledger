@@ -6,8 +6,6 @@ const wreck = require('wreck')
 
 const whitelist = require('./hapi-auth-whitelist')
 
-var exports = {}
-
 exports.debug = (info, request) => {
   const debug = new SDebug(info.id)
 
@@ -200,5 +198,3 @@ const WreckDelete = async (server, opts) => {
 }
 
 exports.wreck = { get: WreckGet, patch: WreckPatch, post: WreckPost, put: WreckPut, delete: WreckDelete }
-
-module.exports = exports

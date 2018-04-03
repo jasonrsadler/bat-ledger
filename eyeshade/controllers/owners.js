@@ -41,17 +41,36 @@ const ownerString = (owner, info) => {
 v1.bulk = {
   handler: (runtime) => {
     return async (request, reply) => {
-      const authorizer = request.payload.authorizer
-      const providers = request.payload.providers || []
+      const { payload } = request
+      const {
+        authorizer,
+        contactInfo,
+        providers: givenProviders
+      } = payload
+      const providers = givenProviders || []
       const channels = []
       let info = {}
+      const {
+        owner,
+        ownerEmail,
+        ownerName
+      } = authorizer
 
-      if (authorizer.ownerEmail || authorizer.ownerName) info = { email: authorizer.ownerEmail, name: authorizer.ownerName }
+      if (ownerEmail || ownerName) {
+        info = {
+          email: ownerEmail,
+          name: ownerName
+        }
+      }
+
       providers.forEach((provider) => {
-        channels.push(underscore.extend({ channelId: provider.publisher, visible: provider.show_verification_status }, info))
+        channels.push(underscore.extend({
+          channelId: provider.publisher,
+          visible: provider.show_verification_status
+        }, info))
       })
 
-      bulk(request, reply, runtime, authorizer.owner, request.payload.contactInfo, null, channels)
+      bulk(request, reply, runtime, owner, contactInfo, null, channels)
     }
   },
   auth: {
@@ -369,6 +388,82 @@ v1.unlinkPublisher = {
     params: {
       owner: braveJoi.string().owner().required().description('the owner identity'),
       publisher: braveJoi.string().publisher().required().description('the publisher identity')
+    }
+  },
+
+  response:
+    { schema: Joi.object().length(0) }
+}
+
+/*
+   DELETE /v2/owners/{owner}/{publisher}
+ */
+
+v2.unlinkPublisher = {
+  handler: (runtime) => {
+    return async (request, reply) => {
+      const { params } = request
+      const { owner } = params
+      const debug = braveHapi.debug(module, request)
+      const owners = runtime.database.get('owners', debug)
+      const publishers = runtime.database.get('publishers', debug)
+      const tokens = runtime.database.get('tokens', debug)
+      const state = {
+        $currentDate: {
+          timestamp: { $type: 'timestamp' }
+        },
+        $set: {
+          verified: false,
+          visible: false
+        },
+        $unset: {
+          authority: '',
+          owner: ''
+        }
+      }
+      return owners.findOne({ owner }).then(entry => {
+        if (!entry) {
+          return reply(boom.notFound('no such entry: ' + owner))
+        }
+        // channels to them is publisher to us
+        return publishers.find({ owner }).then(publisherModels => {
+          // successful reply
+          return Promise.all(publisherModels.map(publisher => {
+            const publisherUpdate = publisher.update(state, { upsert: true })
+
+            const tokensUpdate = tokens.remove({
+              publisher
+            }, {
+              justOne: false
+            })
+
+            return Promise.all([
+              publisherUpdate,
+              tokensUpdate
+            ])
+          })).then(result => reply({}))
+        })
+      }).catch(reply)
+    }
+  },
+
+  auth: {
+    strategy: 'simple',
+    mode: 'required'
+  },
+
+  description: 'Unlinks a publisher from an owner',
+  tags: [ 'api', 'publishers' ],
+
+  validate: {
+    headers: Joi.object({ authorization: Joi.string().required() }).unknown(),
+    params: {
+      owner: braveJoi.string().owner().required().description('the owner identity')
+    },
+    payload: {
+      channels: Joi.array().min(1).items(Joi.object().keys({
+        id: braveJoi.string().publisher().required().description('the publisher identity')
+      }))
     }
   },
 
@@ -719,7 +814,8 @@ module.exports.routes = [
   braveHapi.routes.async().path('/v1/owners/{owner}/statement').whitelist().config(v1.getStatement),
   braveHapi.routes.async().path('/v1/owners/{owner}/verify/{publisher}').config(v1.getToken),
   braveHapi.routes.async().put().path('/v1/owners/{owner}/verify/{publisher}').whitelist().config(v1.putToken),
-  braveHapi.routes.async().delete().path('/v1/owners/{owner}/{publisher}').whitelist().config(v1.unlinkPublisher)
+  braveHapi.routes.async().delete().path('/v1/owners/{owner}/{publisher}').whitelist().config(v1.unlinkPublisher),
+  braveHapi.routes.async().delete().path('/v2/owners/{owner}').whitelist().config(v2.unlinkPublisher)
 ]
 
 module.exports.initialize = async (debug, runtime) => {

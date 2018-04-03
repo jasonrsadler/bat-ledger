@@ -1,22 +1,22 @@
-'use strict';
-import BigNumber from 'bignumber.js';
-import UpholdSDK from '@uphold/uphold-sdk-javascript';
-import anonize from 'node-anonize2-relic';
-import crypto from 'crypto';
-import request from 'supertest';
-import test from 'ava';
-import tweetnacl from 'tweetnacl';
-import uuid from 'uuid';
-import { sign } from 'http-request-signature';
-import { extras } from '../../bat-utils';
-import dotenv from 'dotenv';
-dotenv.config();
-const { utils } = extras;
+'use strict'
+import BigNumber from 'bignumber.js'
+import UpholdSDK from '@uphold/uphold-sdk-javascript'
+import anonize from 'node-anonize2-relic'
+import crypto from 'crypto'
+import request from 'supertest'
+import test from 'ava'
+import tweetnacl from 'tweetnacl'
+import uuid from 'uuid'
+import { sign } from 'http-request-signature'
+import { extras } from '../../bat-utils'
+import dotenv from 'dotenv'
+dotenv.config()
+const { utils } = extras
 const {
   requestOk: ok,
   timeout,
-  uint8tohex,
-} = utils;
+  uint8tohex
+} = utils
 
 // FIXME assert has env vars set and is using uphold
 // NOTE this requires a contibution surveyor to have already been created
@@ -207,16 +207,16 @@ test.serial('integration : v2 contribution workflow with uphold BAT wallet', asy
       .get('/v2/surveyor/voting/' + encodeURIComponent(id) + '/' + viewingCredential.parameters.userId)
       .expect(ok).then(response => {
         const surveyor = new anonize.Surveyor(response.body)
-        const publisher = votes[i % votes.length];
+        const publisher = votes[i % votes.length]
         const proof = viewingCredential.submit(surveyor, {
-          publisher,
+          publisher
         })
         return request(srv.listener)
           .put('/v2/surveyor/voting/' + encodeURIComponent(id))
-          .send({ proof, })
+          .send({ proof })
           .expect(ok)
       })
-  }));
+  }))
 })
 
 test('integration : v2 grant contribution workflow with uphold BAT wallet', async t => {
@@ -345,6 +345,7 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
     viewingId: viewingId
   }
 
+  // console.log(payload)
   do { // Contribution surveyor creation is handled asynchonously, this API will return 503 until ready
     if (response.status === 503) {
       await timeout(response.headers['retry-after'] * 1000)
@@ -355,7 +356,6 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
   } while (response.status === 503)
   err = ok(response)
   if (err) throw err
-
   t.false(response.body.hasOwnProperty('satoshis'))
   t.true(response.body.hasOwnProperty('altcurrency'))
   t.true(response.body.hasOwnProperty('probi'))
@@ -385,17 +385,32 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
   viewingCredential.finalize(response.body.verification)
 
   const votes = ['wikipedia.org', 'reddit.com', 'youtube.com', 'ycombinator.com', 'google.com']
-  // const votes = ['basicattentiontoken.org']
-  for (var i = 0; i < surveyorIds.length; i++) {
-    const id = surveyorIds[i]
-    response = await request(srv.listener)
+  await Promise.all(surveyorIds.map((id, i) => {
+    return request(srv.listener)
       .get('/v2/surveyor/voting/' + encodeURIComponent(id) + '/' + viewingCredential.parameters.userId)
-      .expect(ok)
+      .expect(ok).then(response => {
+        const surveyor = new anonize.Surveyor(response.body)
+        const publisher = votes[i % votes.length]
+        // console.log(id, publisher)
+        const proof = viewingCredential.submit(surveyor, {
+          publisher
+        })
+        return request(srv.listener)
+          .put('/v2/surveyor/voting/' + encodeURIComponent(id))
+          .send({ proof })
+          .expect(ok)
+      })
+  }))
+  // for (var i = 0; i < surveyorIds.length; i++) {
+  //   const id = surveyorIds[i]
+  //   response = await request(srv.listener)
+  //     .get('/v2/surveyor/voting/' + encodeURIComponent(id) + '/' + viewingCredential.parameters.userId)
+  //     .expect(ok)
 
-    const surveyor = new anonize.Surveyor(response.body)
-    response = await request(srv.listener)
-      .put('/v2/surveyor/voting/' + encodeURIComponent(id))
-      .send({'proof': viewingCredential.submit(surveyor, { publisher: votes[i % votes.length] })})
-      .expect(ok)
-  }
+  //   const surveyor = new anonize.Surveyor(response.body)
+  //   response = await request(srv.listener)
+  //     .put('/v2/surveyor/voting/' + encodeURIComponent(id))
+  //     .send({'proof': viewingCredential.submit(surveyor, { publisher: votes[i % votes.length] })})
+  //     .expect(ok)
+  // }
 })

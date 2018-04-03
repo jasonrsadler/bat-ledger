@@ -327,8 +327,6 @@ const Server = async (options, runtime) => {
   server.route({ method: 'GET', path: '/{path*}', handler: { file: './documentation/robots.txt' } })
 
   await server.start().then(() => {
-
-
     let resolvers = underscore.uniq([ '8.8.8.8', '8.8.4.4' ].concat(dns.getServers()))
 
     dns.setServers(resolvers)

@@ -24,7 +24,7 @@ const v1 = {}
 const v2 = {}
 
 const qalist = { addresses: process.env.IP_QA_WHITELIST && process.env.IP_QA_WHITELIST.split(',') }
-const { CLAIM_RATE_DISABLED, } = process.env;
+const { CLAIM_RATE_DISABLED } = process.env
 const claimRate = {
   limit: 10,
   window: 24 * 60 * 60
@@ -45,7 +45,7 @@ if (qalist.addresses) {
 
 const qaOnlyP = (request) => {
   const ipaddr = whitelist.ipaddr(request)
-  const { authorizedAddrs, } = qalist;
+  const { authorizedAddrs } = qalist
   return authorizedAddrs &&
     (authorizedAddrs.indexOf(ipaddr) === -1) &&
     (!underscore.find(qalist.authorizedBlocks, block => block.contains(ipaddr)))
@@ -95,7 +95,7 @@ const localeRegExp = /((([a-zA-Z]+(-[a-zA-Z0-9]+){0,2})|\*)(;q=[0-1](\.[0-9]+)?)
 
 v1.read = { handler: (runtime) => {
   return async (request, reply) => {
-    let candidates, entries, priority, promotion, promotionIds;
+    let candidates, entries, priority, promotion, promotionIds
     const debug = braveHapi.debug(module, request)
     // get the query params
     const lang = request.query.lang
@@ -284,8 +284,8 @@ v1.write = { handler: (runtime) => {
   plugins: {
     rateLimit: {
       enabled: !CLAIM_RATE_DISABLED,
-      rate: (request) => claimRate,
-    },
+      rate: (request) => claimRate
+    }
   },
 
   validate: {

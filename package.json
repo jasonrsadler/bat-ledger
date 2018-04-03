@@ -23,7 +23,7 @@
     "heroku-postbuild": "npm run build",
     "ledger-server": "NODE_PATH=dist node --optimize_for_size --max_old_space_size=460 --gc_interval=100 dist/ledger/server.js",
     "ledger-worker": "NODE_PATH=dist node --optimize_for_size --max_old_space_size=460 --gc_interval=100 dist/ledger/worker.js",
-    "lint": "standard",
+    "lint": "standard --fix",
     "start": "echo use 'npm run start-[balance|collector|extractor|eyeshade|helper|ledger]' or 'npm run start-[collector|extractor|eyeshade|ledger]-worker'",
     "start-balance": "NODE_PATH=. DEBUG=*,-babel,-mongo:*,mongo:queries SERVICE=balance ./node_modules/.bin/babel-node balance/server.js",
     "start-collector": "NODE_PATH=. DEBUG=*,-babel,-mongo:*,mongo:queries SERVICE=collector ./node_modules/.bin/babel-node collector/server.js",
@@ -132,7 +132,7 @@
   "devDependencies": {
     "@ava/babel-preset-stage-4": "^1.1.0",
     "ava": "^0.22.0",
-    "babel-eslint": "^8.0.0",
+    "babel-eslint": "^8.2.2",
     "babel-plugin-transform-runtime": "^6.23.0",
     "babel-preset-es2017": "^6.24.1",
     "babel-preset-stage-3": "^6.24.1",
