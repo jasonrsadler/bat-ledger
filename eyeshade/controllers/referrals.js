@@ -121,5 +121,3 @@ module.exports.routes = [
   braveHapi.routes.async().path('/v1/referrals/{transactionId}').whitelist().config(v1.findReferrals),
   braveHapi.routes.async().put().path('/v1/referrals/{transactionId}').whitelist().config(v1.createReferrals)
 ]
-
-/* done. */
