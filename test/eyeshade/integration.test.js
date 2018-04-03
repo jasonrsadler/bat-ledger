@@ -72,7 +72,7 @@ test('eyeshade: get contribution url', async t => {
 test('eyeshade: get contribution data', async t => {
   t.plan(2)
   const name = 'Michael McLaughlin'
-  const phone = '\\+1612-245-8588'
+  const phone = '+1612-245-8588'
   const email = 'mmclaughlin@brave.com'
   const id1 = uuid.v4().toLowerCase()
   const id2 = uuid.v4().toLowerCase()
@@ -93,8 +93,8 @@ test('eyeshade: get contribution data', async t => {
     .post('/v1/owners')
     .set('Authorization', authorization)
     .send(payload)
+    .expect(requestOk)
   const { status: statusCode } = res1
-
   t.true(statusCode === 200)
 
   const url = formPublishersContributionsURL()
@@ -111,11 +111,9 @@ test('eyeshade: get contribution data', async t => {
 async function eyeshadeGET ({ url, domain, expect }) {
   const host = domain || eyeshadeDomain
   const authorization = `Bearer ${token}`
-  let response = request(host)
+  return request(host)
     .get(url)
     .set('Authorization', authorization)
-  response = expect ? response.expect(requestOk) : response
-  return response
 }
 
 async function fetchReport (reportId) {

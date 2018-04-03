@@ -290,7 +290,7 @@ exports.initialize = async (debug, runtime) => {
                 { exclude: 1 }, { hash: 1 }, { auditors: 1 }, { counts: 1 },
                 { altcurrency: 1, probi: 1 },
                 { altcurrency: 1, exclude: 1, probi: 1 },
-                { exclude: 1, counts: 1},
+                { exclude: 1, counts: 1 },
                 { owner: 1, altcurrency: 1, exclude: 1, probi: 1 },
                 { publisher: 1, altcurrency: 1, exclude: 1, probi: 1 } ]
     },

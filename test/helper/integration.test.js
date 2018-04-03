@@ -10,15 +10,41 @@ dotenv.config()
 const { utils } = extras
 const { requestOk } = utils
 const token = 'foobarfoobar'
-const helperDomain = process.env.HELPER_URL || 'https://eyeshade-staging.mercury.basicattentiontoken.org'
-console.log(process.env.HELPER_URL)
+const helperDomain = process.env.BAT_HELPER_SERVER || 'https://eyeshade-staging.mercury.basicattentiontoken.org'
 test('eyeshade: get json url from eyeshade server', async t => {
-  t.plan(1)
+  t.plan(20)
   const url = '/v1/rates'
   const expect = true
   const { body } = await req({ url, expect })
-  console.log(body)
-  t.true(body && typeof body === 'object')
+  /*
+{ altrates:
+   { ETH: { BTC: '0.05472100', USD: '405.50000000' },
+     BTC:
+      { ETH: 18.274519836991285,
+        USD: '7406.79000000',
+        LTC: 57.32958780026372 },
+     USD: { ETH: 0.002466091245376079, BTC: 0.00013501125318795323 },
+     LTC: { BTC: '0.01744300' } },
+  fxrates: { rates: {} },
+  rates: {} }
+  */
+  const { altrates } = body
+  const { ETH, BTC, USD, LTC } = altrates
+  checkKeys(ETH)
+  checkKeys(BTC)
+  checkKeys(USD)
+  checkKeys(LTC)
+
+  function checkKeys (shallow) {
+    Object.keys(shallow).forEach(key => {
+      coerceAndCheck(shallow[key])
+    })
+  }
+
+  function coerceAndCheck (possibleString) {
+    const number = +possibleString
+    t.true(!isNaN(number) && typeof number === 'number')
+  }
 })
 
 async function req ({ url, domain, expect }) {
