@@ -40,7 +40,8 @@
     "test-integration": "ava test/integration.test.js",
     "test-security": "nsp check",
     "test-transition": "ava test/*.transition.test.js",
-    "test-unit": "ava test/*.unit.test.js"
+    "test-unit": "ava test/*.unit.test.js",
+    "precommit": "npm run lint"
   },
   "repository": {
     "type": "git",
@@ -138,6 +139,7 @@
     "babel-preset-stage-3": "^6.24.1",
     "babel-register": "^6.26.0",
     "bitgo": "^4.15.0",
+    "husky": "^0.14.3",
     "npm-check-updates": "^2.12.1",
     "nsp": "^3.1.0",
     "standard": "10.0.3",
