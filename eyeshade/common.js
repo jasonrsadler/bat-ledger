@@ -102,7 +102,7 @@ exports.initialize = async (debug, runtime) => {
       unique: [ { owner: 1 } ],
       others: [ { providerName: 1 }, { providerSuffix: 1 }, { providerValue: 1 }, { visible: 1 },
                 { authorized: 1 }, { authority: 1 },
-                { provider: 1 }, { altcurrency: 1 },
+                { provider: 1 }, { altcurrency: 1 }, { parameters: 1 },
                 { timestamp: 1 } ]
     },
 
@@ -290,6 +290,7 @@ exports.initialize = async (debug, runtime) => {
                 { exclude: 1 }, { hash: 1 }, { auditors: 1 }, { counts: 1 },
                 { altcurrency: 1, probi: 1 },
                 { altcurrency: 1, exclude: 1, probi: 1 },
+                { exclude: 1, counts: 1},
                 { owner: 1, altcurrency: 1, exclude: 1, probi: 1 },
                 { publisher: 1, altcurrency: 1, exclude: 1, probi: 1 } ]
     },
