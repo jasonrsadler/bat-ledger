@@ -364,8 +364,7 @@ v1.unlinkPublisher = {
 
       state = {
         $currentDate: { timestamp: { $type: 'timestamp' } },
-        $set: { verified: false, visible: false },
-        $unset: { authority: '', owner: '' }
+        $unset: { owner: '', parameters: {} }
       }
       await publishers.update({ publisher: publisher }, state, { upsert: true })
 
@@ -557,10 +556,10 @@ v1.getWallet = {
       try {
         if (provider && entry.parameters) result.wallet = await runtime.wallet.status(entry)
         if (result.wallet) {
-          result.wallet = underscore.pick(result.wallet, [ 'provider', 'authorized', 'preferredCurrency', 'availableCurrencies' ])
+          result.wallet = underscore.pick(result.wallet, [ 'provider', 'authorized', 'defaultCurrency', 'availableCurrencies' ])
           rates = result.rates
 
-          underscore.union([ result.wallet.preferredCurrency ], result.wallet.availableCurrencies).forEach((currency) => {
+          underscore.union([ result.wallet.defaultCurrency ], result.wallet.availableCurrencies).forEach((currency) => {
             const fxrates = runtime.currency.fxrates
 
             if ((rates[currency]) || (!rates[fxrates.base]) || (!fxrates.rates[currency])) return
@@ -613,7 +612,7 @@ v1.getWallet = {
       wallet: Joi.object().keys({
         provider: Joi.string().required().description('wallet provider'),
         authorized: Joi.boolean().optional().description('publisher is authorized by provider'),
-        preferredCurrency: braveJoi.string().anycurrencyCode().optional().default('USD').description('the preferred currency'),
+        defaultCurrency: braveJoi.string().anycurrencyCode().optional().default('USD').description('the default currency to pay a publisher in'),
         availableCurrencies: Joi.array().items(braveJoi.string().anycurrencyCode()).description('available currencies')
       }).unknown(true).optional().description('publisher wallet information'),
       status: Joi.object().keys({
@@ -634,6 +633,7 @@ v1.putWallet = {
       const owner = request.params.owner
       const payload = request.payload
       const provider = payload.provider
+      const defaultCurrency = payload.defaultCurrency
       const visible = payload.show_verification_status
       const debug = braveHapi.debug(module, request)
       const owners = runtime.database.get('owners', debug)
@@ -647,7 +647,12 @@ v1.putWallet = {
       state = {
         $currentDate: { timestamp: { $type: 'timestamp' } },
         $set: underscore.extend(payload, {
-          visible: visible, verified: true, altcurrency: altcurrency, authorized: true, authority: provider
+          visible: visible,
+          verified: true,
+          altcurrency: altcurrency,
+          authorized: true,
+          authority: provider,
+          defaultCurrency: defaultCurrency || entry.defaultCurrency
         })
       }
       await owners.update({ owner: owner }, state, { upsert: true })
@@ -662,8 +667,8 @@ v1.putWallet = {
       runtime.notify(debug, {
         channel: '#publishers-bot',
         text: 'owner ' + ownerString(owner, entry.info) + ' ' +
-          (payload.parameters && payload.parameters.access_token ? 'registered with' : 'unregistered from') + ' ' + provider +
-          ': ' + sites.join(' ')
+          (payload.parameters && (payload.parameters.access_token || payload.defaultCurrency) ? 'registered with'
+           : 'unregistered from') + ' ' + provider + ': ' + sites.join(' ')
       })
 
       reply({})
@@ -682,7 +687,9 @@ v1.putWallet = {
     headers: Joi.object({ authorization: Joi.string().required() }).unknown(),
     payload: {
       provider: Joi.string().required().description('wallet provider'),
-      parameters: Joi.object().required().description('wallet parameters')
+      parameters: Joi.object().optional().description('wallet parameters'),
+      defaultCurrency: braveJoi.string().anycurrencyCode().optional().default('USD').description('the default currency to pay a publisher in'),
+      show_verification_status: Joi.boolean().optional().default(true).description('authorizes display')
     }
   },
 
