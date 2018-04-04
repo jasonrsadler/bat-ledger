@@ -13,6 +13,7 @@ services:
       - "BAT_EYESHADE_SERVER=${BAT_EYESHADE_SERVER-http://eyeshade-web:3002}"
       - "BAT_HELPER_SERVER=${BAT_HELPER_SERVER-http://helper-web:3004}"
       - "BAT_GRANT_SERVER=${BAT_GRANT_SERVER-http://grant-web:3333}"
+      - CLAIM_RATE_DISABLED
       - BALANCE_CACHE_TTL_S
       - BALANCE_TOKEN
       - BALANCE_URL
