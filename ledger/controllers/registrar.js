@@ -126,8 +126,8 @@ const createPersona = function (runtime, apiVersion) {
     const debug = braveHapi.debug(module, request)
     const uId = request.params.uId.toLowerCase()
     const proof = request.payload.proof
-    var response = {}
     const credentials = runtime.database.get('credentials', debug)
+    let response = {}
     let entry, registrar, state, verification, requestSchema, requestType
 
     registrar = runtime.registrars['persona']
@@ -250,7 +250,7 @@ const createViewing = function (runtime) {
     const debug = braveHapi.debug(module, request)
     const uId = request.params.uId.toLowerCase()
     const proof = request.payload.proof
-    var response = {}
+    const response = {}
     const credentials = runtime.database.get('credentials', debug)
     let entry, registrar, state, verification
 

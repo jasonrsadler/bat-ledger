@@ -1,8 +1,6 @@
 const json2csv = require('json2csv')
 const underscore = require('underscore')
 
-var exports = {}
-
 exports.workers = {
 /* retrieve the entire ruleset
 
@@ -102,5 +100,3 @@ exports.workers = {
       runtime.notify(debug, { channel: '#ledger-bot', text: authority + ' report-publisher-rulesets completed' })
     }
 }
-
-module.exports = exports

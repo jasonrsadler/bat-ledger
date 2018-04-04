@@ -1,4 +1,3 @@
-var exports = {}
 
 // courtesy of https://stackoverflow.com/questions/33289726/combination-of-async-function-await-settimeout#33292942
 exports.timeout = (msec) => new Promise((resolve) => setTimeout(resolve, msec))
@@ -47,5 +46,3 @@ cd to ~/go/src/github.com/brave-intl/bat-go and run "./grant-server"`
     }
   }
 }
-
-module.exports = exports

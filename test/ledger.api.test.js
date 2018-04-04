@@ -8,23 +8,15 @@ import tweetnacl from 'tweetnacl'
 import uuid from 'uuid'
 import { sign } from 'http-request-signature'
 import dotenv from 'dotenv'
+import { extras } from '../bat-utils'
 import server from '../ledger/server'
 dotenv.config()
-function ok (res) {
-  if (res.status !== 200) {
-    return new Error(JSON.stringify(res.body, null, 2).replace(/\\n/g, '\n'))
-  }
-}
-
-function uint8tohex (arr) {
-  var strBuilder = []
-  arr.forEach(function (b) { strBuilder.push(('00' + b.toString(16)).substr(-2)) })
-  return strBuilder.join('')
-}
-
-const snooze = ms => {
-  return new Promise(resolve => setTimeout(resolve, ms))
-}
+const { utils } = extras
+const {
+  requestOk: ok,
+  uint8tohex,
+  timeout: snooze
+} = utils
 
 test('server api : respsonds with ack', async t => {
   const srv = await server
@@ -43,7 +35,7 @@ test('api : v2 contribution workflow with BAT', async t => {
   const personaId = uuid.v4().toLowerCase()
   const viewingId = uuid.v4().toLowerCase()
   // create a persona
-  var response = await request(srv.listener).get('/v2/registrar/persona').expect(ok)
+  let response = await request(srv.listener).get('/v2/registrar/persona').expect(ok)
   t.true(response.body.hasOwnProperty('registrarVK'))
   const personaCredential = new anonize.Credential(personaId, response.body.registrarVK)
   const keypair = tweetnacl.sign.keyPair()
@@ -53,8 +45,8 @@ test('api : v2 contribution workflow with BAT', async t => {
     currency: 'BAT',
     publicKey: uint8tohex(keypair.publicKey)
   }
-  var octets = JSON.stringify(body)
-  var headers = {
+  let octets = JSON.stringify(body)
+  let headers = {
     digest: 'SHA-256=' + crypto.createHash('sha256').update(octets).digest('base64')
   }
 
@@ -64,7 +56,8 @@ test('api : v2 contribution workflow with BAT', async t => {
     secretKey: uint8tohex(keypair.secretKey)
   }, { algorithm: 'ed25519' })
 
-  var payload = { requestType: 'httpSignature',
+  let payload = {
+    requestType: 'httpSignature',
     request: {
       body: body,
       headers: headers,
@@ -107,7 +100,7 @@ test('api : v2 contribution workflow with BAT', async t => {
     response = await request(srv.listener)
       .get('/v2/wallet/' + paymentId + '?refresh=true&amount=1&currency=USD')
   } while (response.status === 503)
-  var err = ok(response)
+  let err = ok(response)
   if (err) throw err
 
   t.true(response.body.hasOwnProperty('balance'))
@@ -181,7 +174,7 @@ test('api : v2 contribution workflow with BAT', async t => {
   viewingCredential.finalize(response.body.verification)
 
   const votes = ['wikipedia.org', 'reddit.com', 'youtube.com', 'ycombinator.com', 'google.com']
-  for (var i = 0; i < surveyorIds.length; i++) {
+  for (let i = 0; i < surveyorIds.length; i++) {
     const id = surveyorIds[i]
     response = await request(srv.listener)
       .get('/v2/surveyor/voting/' + encodeURIComponent(id) + '/' + viewingCredential.parameters.userId)

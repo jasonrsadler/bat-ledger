@@ -360,8 +360,6 @@ const reasonCode = (debug, runtime, reason) => {
   return 999
 }
 
-var exports = {}
-
 exports.initialize = async (debug, runtime) => {
   altcurrency = runtime.config.altcurrency || 'BAT'
 }
@@ -717,5 +715,3 @@ exports.workers = {
       })
     }
 }
-
-module.exports = exports

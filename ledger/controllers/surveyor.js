@@ -332,7 +332,7 @@ v2.phase1 =
       duration: underscore.now() - now
     })
 
-    var payload = surveyor.payload
+    const payload = surveyor.payload
     if (request.params.apiV === 'v1') {
       if (payload.adFree) {
         payload.adFree = underscore.omit(underscore.extend(payload.adFree, { satoshis: Number(payload.adFree.probi) }), ['altcurrency', 'probi'])

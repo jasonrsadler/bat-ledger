@@ -429,6 +429,7 @@ v2.unlinkPublisher = {
         return publishers.find({ owner }).then(publisherModels => {
           // successful reply
           return Promise.all(publisherModels.map(publisher => {
+            // empty the publisher
             const publisherUpdate = publisher.update(state, { upsert: true })
 
             const tokensUpdate = tokens.remove({

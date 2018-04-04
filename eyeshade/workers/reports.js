@@ -884,8 +884,6 @@ const date2objectId = (iso8601, ceilP) => {
                        (ceilP ? 'ffffffffffffffff' : '0000000000000000'))
 }
 
-var exports = {}
-
 exports.initialize = async (debug, runtime) => {
   altcurrency = runtime.config.altcurrency || 'BAT'
 
@@ -1682,5 +1680,3 @@ exports.workers = {
       runtime.notify(debug, { channel: '#publishers-bot', text: authority + ' report-grants-outstanding completed' })
     }
 }
-
-module.exports = exports

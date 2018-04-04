@@ -454,18 +454,23 @@ Wallet.providers.mock = {
   },
   unsignedTx: async function (info, amount, currency, balance) {
     if (info.altcurrency === 'BTC') {
-      var tx = new bitcoinjs.TransactionBuilder()
-      var txId = 'aa94ab02c182214f090e99a0d57021caffd0f195a81c24602b1028b130b63e31'
+      let tx = new bitcoinjs.TransactionBuilder()
+      let txId = 'aa94ab02c182214f090e99a0d57021caffd0f195a81c24602b1028b130b63e31'
       tx.addInput(txId, 0)
       tx.addOutput(this.config.settlementAddress['BTC'], 845480)
 
-      return { 'requestType': 'bitcoinMultisig',
-        'unsignedTx': { 'transactionHex': tx.buildIncomplete().toHex() }
+      return {
+        requestType: 'bitcoinMultisig',
+        unsignedTx: {
+          transactionHex: tx.buildIncomplete().toHex()
+        }
       }
     } else if (info.altcurrency === 'BAT' && info.provider === 'mockHttpSignature') {
-      return { 'requestType': 'httpSignature',
-        'unsignedTx': { 'denomination': { 'amount': '24.1235', currency: 'BAT' },
-          'destination': this.config.settlementAddress['BAT']
+      return {
+        requestType: 'httpSignature',
+        unsignedTx: {
+          denomination: { 'amount': '24.1235', currency: 'BAT' },
+          destination: this.config.settlementAddress['BAT']
         }
       }
     } else {

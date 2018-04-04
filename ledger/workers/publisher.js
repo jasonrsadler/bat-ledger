@@ -1,8 +1,6 @@
 const tldjs = require('tldjs')
 const underscore = require('underscore')
 
-var exports = {}
-
 exports.workers = {
 /* send by eyeshade GET /v1/publishers/{publisher}/verify
 
@@ -37,5 +35,3 @@ exports.workers = {
       await publishers.update({ publisher: publisher }, state, { upsert: true })
     }
 }
-
-module.exports = exports

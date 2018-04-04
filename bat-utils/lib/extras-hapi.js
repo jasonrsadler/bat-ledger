@@ -48,7 +48,7 @@ exports.isSimpleTokenValid = (tokenList, token) => {
     throw new TypeError('token must be a string')
   }
 
-  for (var i = 0; i < tokenList.length; i++) {
+  for (let i = 0; i < tokenList.length; i++) {
     if (constantTimeEquals(tokenList[i], token)) {
       return true
     }

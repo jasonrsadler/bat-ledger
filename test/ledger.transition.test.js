@@ -11,35 +11,28 @@ import underscore from 'underscore'
 import uuid from 'uuid'
 import { sign } from 'http-request-signature'
 
+import { extras } from '../bat-utils'
+const { utils } = extras
+const {
+  requestOk: ok,
+  uint8tohex,
+  timeout: snooze
+} = utils
 const bitgo = new bg.BitGo({ env: 'test' })
-
-function ok (res) {
-  if (res.status !== 200) {
-    return new Error(JSON.stringify(res.body, null, 2).replace(/\\n/g, '\n'))
-  }
-}
-
-function uint8tohex (arr) {
-  var strBuilder = []
-  arr.forEach(function (b) { strBuilder.push(('00' + b.toString(16)).substr(-2)) })
-  return strBuilder.join('')
-}
-
-const snooze = ms => new Promise(resolve => setTimeout(resolve, ms))
 
 test('transition', async t => {
   const btcSrv = { listener: process.env.LEDGER_SERVER || 'https://ledger-staging.brave.com' }
   const batSrv = { listener: process.env.BAT_LEDGER_SERVER || 'https://ledger-staging.mercury.basicattentiontoken.org' }
   const personaId = uuid.v4().toLowerCase()
 
-  var response = await request(btcSrv.listener).get('/v1/registrar/persona').expect(ok)
+  let response = await request(btcSrv.listener).get('/v1/registrar/persona').expect(ok)
   t.true(response.body.hasOwnProperty('registrarVK'))
   const btcPersonaCredential = new anonize.Credential(personaId, response.body.registrarVK)
   const keychains = { user: bitgo.keychains().create(), passphrase: 'passphrase' }
 
   keychains.user.encryptedXprv = bitgo.encrypt({ password: keychains.passphrase, input: keychains.user.xprv })
   keychains.user.path = 'm'
-  var payload = { keychains: { user: underscore.pick(keychains.user, [ 'xpub', 'path', 'encryptedXprv' ]) },
+  let payload = { keychains: { user: underscore.pick(keychains.user, [ 'xpub', 'path', 'encryptedXprv' ]) },
     proof: btcPersonaCredential.request()
   }
 
@@ -63,8 +56,8 @@ test('transition', async t => {
     currency: 'BAT',
     publicKey: uint8tohex(keypair.publicKey)
   }
-  var octets = JSON.stringify(body)
-  var headers = {
+  let octets = JSON.stringify(body)
+  let headers = {
     digest: 'SHA-256=' + crypto.createHash('sha256').update(octets).digest('base64')
   }
 

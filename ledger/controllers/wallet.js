@@ -323,7 +323,7 @@ const write = function (runtime, apiVersion) {
     }
     await viewings.update({ viewingId: viewingId }, state, { upsert: true })
 
-    var picked = ['votes', 'probi', 'altcurrency']
+    const picked = ['votes', 'probi', 'altcurrency']
     // BTC only
     if (result.hash) {
       picked.push('hash')

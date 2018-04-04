@@ -1,8 +1,6 @@
 const bson = require('bson')
 const underscore = require('underscore')
 
-var exports = {}
-
 exports.workers = {
 /* sent by ledger POST /v1/registrar/persona/{personaId}
 
@@ -206,5 +204,3 @@ exports.workers = {
       await grants.update({ grantId: { $in: grantIds } }, state, { upsert: true })
     }
 }
-
-module.exports = exports

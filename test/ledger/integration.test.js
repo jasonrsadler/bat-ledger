@@ -25,7 +25,7 @@ test.serial('integration : v2 contribution workflow with uphold BAT wallet', asy
   const personaId = uuid.v4().toLowerCase()
   const viewingId = uuid.v4().toLowerCase()
 
-  var response = await request(srv.listener).get('/v2/registrar/persona').expect(ok)
+  let response = await request(srv.listener).get('/v2/registrar/persona').expect(ok)
   t.true(response.body.hasOwnProperty('registrarVK'))
   const personaCredential = new anonize.Credential(personaId, response.body.registrarVK)
 
@@ -41,8 +41,8 @@ test.serial('integration : v2 contribution workflow with uphold BAT wallet', asy
     currency: 'BAT',
     publicKey: uint8tohex(keypair.publicKey)
   }
-  var octets = JSON.stringify(body)
-  var headers = {
+  let octets = JSON.stringify(body)
+  let headers = {
     digest: 'SHA-256=' + crypto.createHash('sha256').update(octets).digest('base64')
   }
 
@@ -52,7 +52,7 @@ test.serial('integration : v2 contribution workflow with uphold BAT wallet', asy
     secretKey: uint8tohex(keypair.secretKey)
   }, { algorithm: 'ed25519' })
 
-  var payload = {
+  let payload = {
     requestType: 'httpSignature',
     request: {
       body: body,
@@ -98,7 +98,7 @@ test.serial('integration : v2 contribution workflow with uphold BAT wallet', asy
       .get('/v2/wallet/' + paymentId + '?refresh=true&amount=1&currency=USD')
     if (response.status === 503) await timeout(response.headers['retry-after'] * 1000)
   } while (response.status === 503)
-  var err = ok(response)
+  let err = ok(response)
   if (err) throw err
 
   t.true(response.body.hasOwnProperty('balance'))
@@ -224,7 +224,7 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
   const personaId = uuid.v4().toLowerCase()
   const viewingId = uuid.v4().toLowerCase()
 
-  var response = await request(srv.listener).get('/v2/registrar/persona').expect(ok)
+  let response = await request(srv.listener).get('/v2/registrar/persona').expect(ok)
   t.true(response.body.hasOwnProperty('registrarVK'))
   const personaCredential = new anonize.Credential(personaId, response.body.registrarVK)
 
@@ -240,8 +240,8 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
     currency: 'BAT',
     publicKey: uint8tohex(keypair.publicKey)
   }
-  var octets = JSON.stringify(body)
-  var headers = {
+  let octets = JSON.stringify(body)
+  let headers = {
     digest: 'SHA-256=' + crypto.createHash('sha256').update(octets).digest('base64')
   }
 
@@ -251,7 +251,7 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
     secretKey: uint8tohex(keypair.secretKey)
   }, { algorithm: 'ed25519' })
 
-  var payload = {
+  let payload = {
     requestType: 'httpSignature',
     request: {
       body: body,
@@ -319,7 +319,7 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
     if (response.status === 503) await timeout(response.headers['retry-after'] * 1000)
     else if (response.body.balance === '0.0000') await timeout(500)
   } while (response.status === 503 || response.body.balance === '0.0000')
-  var err = ok(response)
+  let err = ok(response)
   if (err) throw err
 
   t.is(Number(response.body.unsignedTx.denomination.amount), Number(desired))
@@ -391,7 +391,6 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
       .expect(ok).then(response => {
         const surveyor = new anonize.Surveyor(response.body)
         const publisher = votes[i % votes.length]
-        // console.log(id, publisher)
         const proof = viewingCredential.submit(surveyor, {
           publisher
         })
@@ -401,7 +400,8 @@ test('integration : v2 grant contribution workflow with uphold BAT wallet', asyn
           .expect(ok)
       })
   }))
-  // for (var i = 0; i < surveyorIds.length; i++) {
+  // recheck old code if you want
+  // for (let i = 0; i < surveyorIds.length; i++) {
   //   const id = surveyorIds[i]
   //   response = await request(srv.listener)
   //     .get('/v2/surveyor/voting/' + encodeURIComponent(id) + '/' + viewingCredential.parameters.userId)

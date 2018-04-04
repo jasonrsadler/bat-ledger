@@ -52,7 +52,6 @@ const periodic = async (debug, runtime) => {
   setTimeout(() => { periodic(debug, runtime) }, next - now)
   debug('periodic', 'running again ' + moment(next).fromNow())
 }
-var exports = {}
 
 exports.initialize = async (debug, runtime) => {
   if ((typeof process.env.DYNO === 'undefined') || (process.env.DYNO === 'worker.1')) {
@@ -215,5 +214,3 @@ const handlers = {
     await pseries.update({ tsId: tsId }, state, { upsert: true })
   }
 }
-
-module.exports = exports

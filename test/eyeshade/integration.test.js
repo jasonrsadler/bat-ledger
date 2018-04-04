@@ -102,7 +102,7 @@ test('eyeshade: get contribution data', async t => {
   const { reportId } = bod
   const res2 = await fetchReport(reportId)
   const { body: body2 } = res2
-  console.log('contribution data', body2)
+  console.log('contribution data', reportId, body2)
   const isArray = Array.isArray(body2)
 
   t.true(isArray)
