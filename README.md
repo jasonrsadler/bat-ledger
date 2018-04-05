@@ -83,7 +83,7 @@ docker-compose build
 docker logout
 # then build again
 ```
-```bash 
+```bash
 # if you're running into issues with the grant server
 cd ~/go/src/github.com/brave-intl/bat-go
 make docker
@@ -105,4 +105,21 @@ use admin
 ```bash
 # start up the tests
 docker-compose run --rm -v $(pwd)/test:/usr/src/app/test ledger-web npm run test-integration
+```
+whenever you run out of grants, or just want to wipe them
+```
+# get into the docker mongo
+docker exec -it ledger-mongo mongo
+# change the db to admin
+use admin
+# remove all grants, publishers and surveyors
+db.surveyors.remove({})
+db.grants.remove({})
+db.publishersX.remove({})
+db.publishersV2.remove({})
+```
+after removing the models from the db, clear the redis db, so you aren't blocked
+```
+docker exec -it grant-redis redis-cli
+> flushdb
 ```
