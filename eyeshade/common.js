@@ -164,14 +164,26 @@ exports.initialize = async (debug, runtime) => {
 
         transactionId: '',
         publisher: '',
+        owner: '',
         platform: '',
         finalized: bson.Timestamp.ZERO,
+
+        altcurrency: '',
+        probi: bson.Decimal128.POSITIVE_ZERO,
+
+     // added by administrator
+        exclude: false,
+        hash: '',
 
         timestamp: bson.Timestamp.ZERO
       },
       unique: [ { downloadId: 1 } ],
-      others: [ { transactionId: 1 }, { publisher: 1 }, { finalized: 1 },
-                { timestamp: 1 } ]
+      others: [ { transactionId: 1 }, { publisher: 1 }, { owner: 1 }, { finalized: 1 },
+                { altcurrency: 1 }, { probi: 1 }, { exclude: 1 }, { hash: 1 }, { timestamp: 1 },
+                { altcurrency: 1, probi: 1 },
+                { altcurrency: 1, exclude: 1, probi: 1 },
+                { owner: 1, altcurrency: 1, exclude: 1, probi: 1 },
+                { publisher: 1, altcurrency: 1, exclude: 1, probi: 1 } ]
     },
 
     {

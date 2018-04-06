@@ -1,4 +1,5 @@
 const boom = require('boom')
+const bson = require('bson')
 const Joi = require('joi')
 const underscore = require('underscore')
 
@@ -14,6 +15,8 @@ const schema = Joi.array().min(1).items(Joi.object().keys({
   platform: Joi.string().token().required().description('the download platform'),
   finalized: Joi.date().iso().required().description('timestamp in ISO 8601 format').example('2018-03-22T23:26:01.234Z')
 }).unknown(true)).required().description('list of finalized referrals')
+
+let altcurrency
 
 /*
    GET /v1/referrals/{transactionID}
@@ -32,7 +35,8 @@ v1.findReferrals = {
 
       results = []
       entries.forEach((entry) => {
-        results.push(underscore.extend({ channelId: entry.publisher }, underscore.pick(entry, [ 'downloadId', 'platform', 'finalized' ])))
+        results.push(underscore.extend({ channelId: entry.publisher },
+                                       underscore.pick(entry, [ 'downloadId', 'platform', 'finalized' ])))
       })
       reply(results)
     }
@@ -68,14 +72,23 @@ v1.createReferrals = {
       const transactionId = request.params.transactionId
       const payload = request.payload
       const debug = braveHapi.debug(module, request)
+      const publishers = runtime.database.get('publishers', debug)
       const referrals = runtime.database.get('referrals', debug)
-      let entries, matches, query
+      let entries, matches, probi, query
 
       entries = await referrals.find({ transactionId: transactionId })
       if (entries.length > 0) return reply(boom.badData('existing transaction-identifier: ' + transactionId))
 
+      probi = runtime.currency.fiat2alt(runtime.config.referrals.currency, runtime.config.referrals.amount, altcurrency)
+      probi = bson.Decimal128.fromString(probi.toString())
       query = { $or: [] }
-      for (let referral of payload) query.$or.push({ downloadId: referral.downloadId })
+      for (let referral of payload) {
+        const entry = await publishers.findOne({ publisher: referral.channelId })
+        if (!entry) return reply(boom.badData('no such channelId: ' + referral.channelId))
+
+        underscore.extend(referral, { owner: entry.owner, altcurrency: altcurrency, probi: probi })
+        query.$or.push({ downloadId: referral.downloadId })
+      }
       entries = await referrals.find(query)
       if (entries.length > 0) {
         matches = []
@@ -89,12 +102,12 @@ v1.createReferrals = {
 
         state = {
           $currentDate: { timestamp: { $type: 'timestamp' } },
-          $set: {
+          $set: underscore.extend({
             transactionId: transactionId,
             publisher: referral.channelId,
-            platform: referral.platform,
-            finalized: new Date(referral.finalized)
-          }
+            finalized: new Date(referral.finalized),
+            exclude: false
+          }, underscore.pick(referral, [ 'owner', 'platform', 'altcurrency', 'platform' ]))
         }
         await referrals.update({ downloadId: referral.downloadId }, state, { upsert: true })
       }
@@ -127,3 +140,7 @@ module.exports.routes = [
   braveHapi.routes.async().path('/v1/referrals/{transactionId}').whitelist().config(v1.findReferrals),
   braveHapi.routes.async().put().path('/v1/referrals/{transactionId}').whitelist().config(v1.createReferrals)
 ]
+
+module.exports.initialize = async (debug, runtime) => {
+  altcurrency = runtime.config.altcurrency || 'BAT'
+}
