@@ -108,12 +108,9 @@ v2.settlement = {
         publisher = await publishers.findOne({ publisher: entry.publisher })
         if (!publisher) return reply(boom.badData('no such entry: ' + entry.publisher))
 
-        if (!publisher.owner) return reply(boom.badData('no owner for publisher: ' + entry.publisher))
-
-        owner = await owners.findOne({ owner: publisher.owner })
+        // The owner at the time of uploading could be different
+        owner = await owners.findOne({ owner: entry.owner })
         if (!owner) return reply(boom.badData('no such owner ' + publisher.owner + ' for entry: ' + entry.publisher))
-
-        entry.owner = publisher.owner
       }
 
       state = {

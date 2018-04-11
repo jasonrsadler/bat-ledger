@@ -352,6 +352,7 @@ exports.initialize = async (debug, runtime) => {
   await runtime.queue.create('publishers-bulk-create')
   await runtime.queue.create('report-grants-outstanding')
   await runtime.queue.create('report-publishers-contributions')
+  await runtime.queue.create('report-publishers-referrals')
   await runtime.queue.create('report-publishers-settlements')
   await runtime.queue.create('report-publishers-statements')
   await runtime.queue.create('report-publishers-status')
