@@ -35,13 +35,18 @@ const create = async (runtime, prefix, params) => {
 }
 
 const notification = async (debug, runtime, owner, publisher, payload) => {
-  let message = await runtime.common.publish(debug, runtime, 'post', owner, publisher, '/notifications', payload)
+  try {
+    let message = await runtime.common.publish(debug, runtime, 'post', owner, publisher, '/notifications', payload)
 
-  if (!message) return
+    if (!message) return
 
-  message = underscore.extend({ owner: owner, publisher: publisher }, payload)
-  debug('notify', message)
-  runtime.notify(debug, { channel: '#publishers-bot', text: 'publishers notified: ' + JSON.stringify(message) })
+    message = underscore.extend({ owner: owner, publisher: publisher }, payload)
+    debug('notify', message)
+    runtime.notify(debug, { channel: '#publishers-bot', text: 'publishers notified: ' + JSON.stringify(message) })
+  } catch (ex) {
+    runtime.captureException(ex)
+    debug('notify-failed', { reason: ex.toString(), stack: ex.stack })
+  }
 }
 
 const daily = async (debug, runtime) => {
