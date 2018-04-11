@@ -1032,7 +1032,8 @@ const prepareReferralPayout = async (debug, runtime, authority, reportId, thresh
   const payments = []
   for (let i = 0; i < eligPublishers.length; i++) {
     const payment = statements[eligPublishers[i]].balance
-    payment.fees = payment.probi.times(feePercent)
+    payment.type = 'referral'
+    payment.fees = payment.probi.times(feePercent).truncated()
     payment.probi = payment.probi.minus(payment.fees)
     payment.authority = authority
     payment.transactionId = reportId
@@ -1252,6 +1253,9 @@ exports.workers = {
 
             datum.address = wallet.address
             datum.currency = wallet.defaultCurrency
+
+            datum.type = 'contribution'
+
             entries.push(datum)
           } catch (ex) {
             await notification(debug, runtime, entry.owner, datum.publisher, { type: 'verified_invalid_wallet' })
