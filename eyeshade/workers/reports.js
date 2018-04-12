@@ -1403,7 +1403,7 @@ exports.workers = {
       if (publisher) {
         query = { publisher: publisher }
         entries = await settlements.find(query)
-        publishers = await mixer(debug, runtime, publisher, range, undefined)
+        publishers = await mixer(debug, runtime, [ publisher ], range, undefined)
       } else {
         query = underscore.pick(payload, [ 'owner', 'hash', 'settlementId' ])
         if (range) query._id = range

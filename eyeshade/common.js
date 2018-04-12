@@ -222,17 +222,18 @@ exports.initialize = async (debug, runtime) => {
         owner: '',
         altcurrency: '',
         probi: bson.Decimal128.POSITIVE_ZERO,
+        fees: bson.Decimal128.POSITIVE_ZERO,          // processing fees
         currency: '',
         amount: bson.Decimal128.POSITIVE_ZERO,
-        commission: bson.Decimal128.POSITIVE_ZERO,    // conversion + network fees (i.e., for settlement)
-
-        fees: bson.Decimal128.POSITIVE_ZERO,          // network fees (i.e., for contribution)
+        commission: bson.Decimal128.POSITIVE_ZERO,    // conversion fee (i.e., for settlement)
+        fee: bson.Decimal128.POSITIVE_ZERO,           // network fee (i.e., for settlement)
+        type: '',
         timestamp: bson.Timestamp.ZERO
       },
       unique: [ { settlementId: 1, publisher: 1 }, { hash: 1, publisher: 1 } ],
       others: [ { address: 1 },
-                { owner: 1 }, { altcurrency: 1 }, { probi: 1 }, { currency: 1 }, { amount: 1 }, { commission: 1 },
-                { fees: 1 }, { timestamp: 1 } ]
+                { owner: 1 }, { altcurrency: 1 }, { probi: 1 }, { fees: 1 }, { currency: 1 }, { amount: 1 }, { commission: 1 },
+                { fee: 1 }, { type: 1 }, { timestamp: 1 } ]
     },
 
     {
