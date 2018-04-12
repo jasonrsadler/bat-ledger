@@ -1066,8 +1066,6 @@ const prepareReferralPayout = async (debug, runtime, authority, reportId, thresh
   return payments
 }
 
-var exports = {}
-
 exports.initialize = async (debug, runtime) => {
   altcurrency = runtime.config.altcurrency || 'BAT'
 
