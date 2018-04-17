@@ -11,6 +11,8 @@ const braveHapi = utils.extras.hapi
 const braveUtils = utils.extras.utils
 const whitelist = utils.hapi.auth.whitelist
 
+const rateLimitEnabled = process.env.NODE_ENV === 'production'
+
 const grantSchema = Joi.object().keys({
   grantId: Joi.string().guid().required().description('the grant-identifier'),
   promotionId: Joi.string().guid().required().description('the associated promotion'),
@@ -24,7 +26,7 @@ const v1 = {}
 const v2 = {}
 
 const qalist = { addresses: process.env.IP_QA_WHITELIST && process.env.IP_QA_WHITELIST.split(',') }
-const { CLAIM_RATE_DISABLED } = process.env
+
 const claimRate = {
   limit: 10,
   window: 24 * 60 * 60
@@ -283,7 +285,7 @@ v1.write = { handler: (runtime) => {
 
   plugins: {
     rateLimit: {
-      enabled: !CLAIM_RATE_DISABLED,
+      enabled: rateLimitEnabled,
       rate: (request) => claimRate
     }
   },
