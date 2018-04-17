@@ -164,7 +164,8 @@ v1.publisher.contributions = {
 
   response: {
     schema: Joi.object().keys({
-      reportURL: Joi.string().uri({ scheme: /https?/ }).optional().description('the URL for a forthcoming report')
+      reportURL: Joi.string().uri({ scheme: /https?/ }).optional().description('the URL for a forthcoming report'),
+      reportId: Joi.string().guid().required().description('the report identifier')
     }).unknown(true)
   }
 }
@@ -236,7 +237,8 @@ v1.publishers.contributions = {
 
   response: {
     schema: Joi.object().keys({
-      reportURL: Joi.string().uri({ scheme: /https?/ }).optional().description('the URL for a forthcoming report')
+      reportURL: Joi.string().uri({ scheme: /https?/ }).optional().description('the URL for a forthcoming report'),
+      reportId: Joi.string().guid().required().description('the report identifier')
     }).unknown(true)
   }
 }
@@ -614,7 +616,8 @@ v1.surveyors.contributions = {
 
   response: {
     schema: Joi.object().keys({
-      reportURL: Joi.string().uri({ scheme: /https?/ }).optional().description('the URL for a forthcoming report')
+      reportURL: Joi.string().uri({ scheme: /https?/ }).optional().description('the URL for a forthcoming report'),
+      reportId: Joi.string().guid().required().description('the report identifier')
     }).unknown(true)
   }
 }

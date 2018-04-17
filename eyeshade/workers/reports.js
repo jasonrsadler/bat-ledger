@@ -807,16 +807,15 @@ const publisherSettlements = (runtime, entries, format, summaryP, spacingP) => {
     entry.created = new Date(parseInt(entry._id.toHexString().substring(0, 8), 16) * 1000).getTime()
     entry.modified = (entry.timestamp.high_ * 1000) + (entry.timestamp.low_ / bson.Timestamp.TWO_PWR_32_DBL_)
     publishers[entry.publisher].txns.push(underscore.pick(entry, [
-      'altcurrency', 'probi', 'currency', 'amount', 'fees', 'commission', 'settlementId', 'address', 'hash', 'created',
-      'modified'
+      'altcurrency', 'probi', 'currency', 'amount', 'fees', 'commission', 'settlementId', 'hash', 'created', 'modified'
     ]))
   })
 
   results = []
   underscore.keys(publishers).forEach((publisher) => {
     const entry = publishers[publisher]
-    const oneP = underscore.groupBy(entry.txns, (txn) => { return txn.currency }).size === 1
     const txns = {}
+    let amountP = true
 
     entry.txns = underscore.sortBy(entry.txns, 'created')
     if (summaryP) {
@@ -834,22 +833,29 @@ const publisherSettlements = (runtime, entries, format, summaryP, spacingP) => {
         row.commission = new BigNumber(row.commission).plus(new BigNumber(txn.commission))
 
         delete row.settlementId
-        if (row.address !== txn.address) delete row.address
         delete row.hash
         row.created = txn.created
         row.modified = txn.modified
       })
 
-      if (underscore.keys(txns).length > 1) entry.txns = underscore.values(txns)
+      if (underscore.size(txns) > 1) entry.txns = underscore.values(txns)
       else {
         lastxn = underscore.last(entry.txns)
         entry.txns = []
       }
+    } else {
+      currency = ''
+      for (let txn of entry.txns) {
+        if (typeof currency === 'undefined') currency = txn.currency
+        else if (currency !== txn.currency) currency = ''
+      }
+      if (currency === '') amountP = false
+      currency = undefined
     }
 
     results.push(underscore.extend({ publisher: publisher }, entry, {
       probi: entry.probi.toString(),
-      amount: oneP ? entry.amount.toString() : '',
+      amount: amountP ? entry.amount.toString() : '',
       fees: entry.fees.toString(),
       commission: entry.commission.toString()
     }))
@@ -1163,7 +1169,7 @@ exports.workers = {
       const scale = new BigNumber(runtime.currency.alt2scale(altcurrency) || 1)
       let data, entries, file, info, previous, publishers, usd
 
-      publishers = await mixer(debug, runtime, publisher && [ publisher ], undefined, cohorts)
+      publishers = await mixer(debug, runtime, [ publisher ], undefined, cohorts)
 
       underscore.keys(publishers).forEach((publisher) => {
         publishers[publisher].authorized = false
@@ -1420,7 +1426,7 @@ exports.workers = {
       usd = runtime.currency.alt2fiat(altcurrency, 1, 'USD', true) || new BigNumber(0)
       data = []
       data1 = { altcurrency: altcurrency, probi: new BigNumber(0), fees: new BigNumber(0) }
-      data2 = { altcurrency: altcurrency, probi: new BigNumber(0), fees: new BigNumber(0) }
+      data2 = { altcurrency: altcurrency, probi: new BigNumber(0), fees: new BigNumber(0), subtotal: {} }
       underscore.keys(publishers).sort(braveHapi.domainCompare).forEach((publisher) => {
         const entry = {}
         let info
@@ -1443,6 +1449,7 @@ exports.workers = {
           if (typeof datum.probi === 'undefined') return
 
           datum.probi = datum.probi.toString()
+          datum.fees = datum.fees.toString()
           datum.amount = datum.amount.toString()
         })
         data = data.concat(info.data)
@@ -1451,7 +1458,7 @@ exports.workers = {
         data.push([])
         if ((!summaryP) && (!payload.owner)) data.push([])
       })
-      if (!publisher) {
+      if ((!publisher) && ((!payload.owner) || (underscore.size(publishers) > 1))) {
         data.push({
           publisher: 'TOTAL',
           altcurrency: data1.altcurrency,
@@ -1464,7 +1471,8 @@ exports.workers = {
         data.push({
           publisher: 'TOTAL',
           altcurrency: data2.altcurrency,
-          probi: data2.probi.toString()
+          probi: data2.probi.toString(),
+          fees: data2.fees.toString()
         })
       }
 
@@ -1493,8 +1501,8 @@ exports.workers = {
         fields.push('probi', 'fees')
         fieldNames.push(altcurrency, altcurrency + ' fees')
         if (!summaryP) {
-          fields.push('counts', 'address')
-          fieldNames.push('counts', 'address')
+          fields.push('counts')
+          fieldNames.push('counts')
         }
 
         await file.write(utf8ify(json2csv({

@@ -716,7 +716,7 @@ v1.putWallet = {
         channel: '#publishers-bot',
         text: 'owner ' + ownerString(owner, entry.info) + ' ' +
           (payload.parameters && payload.parameters.access_token ? 'registered with' : 'unregistered from') + ' ' + provider +
-           ': ' + sites.join(' ')
+          ': ' + sites.join(' ')
       })
 
       reply({})
@@ -785,7 +785,7 @@ v1.patchWallet = {
         channel: '#publishers-bot',
         text: 'owner ' + ownerString(owner, entry.info) + ' ' +
           (payload.parameters && (payload.parameters.access_token || payload.defaultCurrency) ? 'registered with'
-           : 'unregistered from') + ' ' + provider + ': ' + sites.join(' ')
+           : 'unregistered from') + ' ' + (provider || entry.provider) + ': ' + sites.join(' ')
       })
 
       reply({})
@@ -815,7 +815,7 @@ v1.patchWallet = {
 }
 
 /*
-   GET /v1/owner/{owner}/statement
+   GET /v1/owners/{owner}/statement
  */
 
 v1.getStatement = {
