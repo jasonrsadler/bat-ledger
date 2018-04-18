@@ -871,27 +871,33 @@ const publisherSettlements = (runtime, entries, format, summaryP, spacingP) => {
 
   data = []
   results.forEach((result) => {
+    let total
+
     probi = probi.plus(result.probi)
     amount = amount.plus(result.amount || 0)
     fees = fees.plus(result.fees)
     commission = commission.plus(result.commission)
     if (typeof currency === 'undefined') currency = result.currency
     else if (currency !== result.currency) currency = ''
-    data.push({
+    total = {
       publisher: result.publisher,
       altcurrency: result.altcurrency,
       probi: result.probi.toString(),
       currency: result.currency,
-      amount: result.amount.toString(),
+      amount: result.amount || 0,
       fees: result.fees.toString(),
       commission: result.commission.toString(),
       timestamp: lastxn && lastxn.created && dateformat(lastxn.created, datefmt)
-    })
+    }
+    data.push(total)
     result.txns.forEach((txn) => {
       data.push(underscore.extend({ publisher: result.publisher },
                                   underscore.omit(txn, [ 'hash', 'settlementId', 'created', 'modified' ]),
                                   { transactionId: txn.hash, timestamp: txn.created && dateformat(txn.created, datefmt) }))
+      if (total.currency === txn.currency) total.amount = new BigNumber(total.amount).plus(txn.amount || 0).toString()
     })
+    total.amount = total.amount.toString()
+    if (total.amount === '0') total.amount = ''
     if (spacingP) data.push([])
   })
 
@@ -1394,6 +1400,7 @@ exports.workers = {
       const rollupP = payload.rollup
       const starting = payload.starting
       const summaryP = payload.summary
+      const owner = payload.owner
       const publisher = payload.publisher
       const settlements = runtime.database.get('settlements', debug)
       const scale = new BigNumber(runtime.currency.alt2scale(altcurrency) || 1)
@@ -1456,10 +1463,14 @@ exports.workers = {
         data = data.concat(info.data)
         data2.probi = data2.probi.plus(info.probi)
         data2.fees = data2.fees.plus(info.fees)
+        if (info.currency) {
+          data2.amount = info.amount
+          data2.currency = info.currency
+        }
         data.push([])
-        if ((!summaryP) && (!payload.owner)) data.push([])
+        if ((!summaryP) && (!owner)) data.push([])
       })
-      if ((!publisher) && ((!payload.owner) || (underscore.size(publishers) > 1))) {
+      if ((!publisher) && ((!owner) || (underscore.size(publishers) > 1))) {
         data.push({
           publisher: 'TOTAL',
           altcurrency: data1.altcurrency,
@@ -1468,7 +1479,7 @@ exports.workers = {
           'publisher USD': usd && data1.probi.times(usd).dividedBy(scale).toFixed(2),
           'processor USD': usd && data1.fees.times(usd).dividedBy(scale).toFixed(2)
         })
-        if ((!summaryP) && (!payload.owner)) data.push([])
+        if ((!summaryP) && (!owner)) data.push([])
         data.push({
           publisher: 'TOTAL',
           altcurrency: data2.altcurrency,
@@ -1491,17 +1502,19 @@ exports.workers = {
 
         fields.push('timestamp', 'publisher')
         fieldNames.push('timestamp', 'publisher')
-        fields.push('publisher USD', 'processor USD')
-        fieldNames.push('estimated USD', 'estimated fees')
+        if (!owner) {
+          fields.push('publisher USD', 'processor USD')
+          fieldNames.push('estimated USD', 'estimated fees')
+        }
         fields.push('currency', 'amount')
         fieldNames.push('currency', 'amount')
-        if (!summaryP) {
+        if ((!summaryP) && (!owner)) {
           fields.push('transactionId', 'altcurrency')
           fieldNames.push('transactionId', 'altcurrency')
         }
         fields.push('probi', 'fees')
         fieldNames.push(altcurrency, altcurrency + ' fees')
-        if (!summaryP) {
+        if ((!summaryP) && (!owner)) {
           fields.push('counts')
           fieldNames.push('counts')
         }
