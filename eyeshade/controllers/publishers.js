@@ -461,7 +461,7 @@ v2.putWallet = {
       state = {
         $currentDate: { timestamp: { $type: 'timestamp' } },
         $set: underscore.extend(underscore.pick(payload, [ 'provider', 'parameters' ]), {
-          defaultCurrency: payload.default_currency,
+          defaultCurrency: payload.defaultCurrency,
           visible: payload.show_verification_status,
           verified: true,
           altcurrency: altcurrency,
@@ -496,7 +496,7 @@ v2.putWallet = {
       verificationId: Joi.string().guid().required().description('identity of the requestor'),
       provider: Joi.string().required().description('wallet provider'),
       parameters: Joi.object().required().description('wallet parameters'),
-      default_currency: braveJoi.string().anycurrencyCode().optional().default('USD').description('the default currency to pay a publisher in'),
+      defaultCurrency: braveJoi.string().anycurrencyCode().optional().default('USD').description('the default currency to pay a publisher in'),
       show_verification_status: Joi.boolean().optional().default(true).description('authorizes display')
     }
   },

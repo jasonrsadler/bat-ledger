@@ -695,7 +695,7 @@ v1.putWallet = {
       state = {
         $currentDate: { timestamp: { $type: 'timestamp' } },
         $set: underscore.extend(underscore.pick(payload, [ 'provider', 'parameters' ]), {
-          defaultCurrency: payload.default_currency,
+          defaultCurrency: payload.defaultCurrency,
           visible: payload.show_verification_status,
           verified: true,
           altcurrency: altcurrency,
@@ -736,7 +736,7 @@ v1.putWallet = {
     payload: {
       provider: Joi.string().required().description('wallet provider'),
       parameters: Joi.object().required().description('wallet parameters'),
-      default_currency: braveJoi.string().anycurrencyCode().optional().default('USD').description('the default currency to pay a publisher in'),
+      defaultCurrency: braveJoi.string().anycurrencyCode().optional().default('USD').description('the default currency to pay a publisher in'),
       show_verification_status: Joi.boolean().optional().default(true).description('authorizes display')
     }
   },
@@ -768,7 +768,7 @@ v1.patchWallet = {
       state = {
         $currentDate: { timestamp: { $type: 'timestamp' } },
         $set: underscore.pick(underscore.extend(underscore.pick(payload, [ 'provider', 'parameters' ]), {
-          defaultCurrency: payload.default_currency,
+          defaultCurrency: payload.defaultCurrency,
           visible: payload.show_verification_status
         }), (value) => { return (typeof value !== 'undefined') })
       }
@@ -805,7 +805,7 @@ v1.patchWallet = {
     payload: {
       provider: Joi.string().optional().description('wallet provider'),
       parameters: Joi.object().optional().description('wallet parameters'),
-      default_currency: braveJoi.string().anycurrencyCode().optional().description('the default currency to pay a publisher in'),
+      defaultCurrency: braveJoi.string().anycurrencyCode().optional().description('the default currency to pay a publisher in'),
       show_verification_status: Joi.boolean().optional().description('authorizes display')
     }
   },
