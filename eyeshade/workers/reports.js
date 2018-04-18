@@ -706,10 +706,10 @@ const publisherContributions = (runtime, publishers, authority, authorized, veri
     result.fees = result.fees.truncated().toString()
 
     result.votes.forEach((vote) => {
-      vote['publisher USD'] = usd && vote.probi.times(usd).dividedBy(scale).toFixed(2)
-      vote['processor USD'] = usd && vote.fees.times(usd).dividedBy(scale).toFixed(2)
-      vote.probi = vote.probi.truncated().toString()
-      vote.fees = vote.fees.truncated().toString()
+      vote['publisher USD'] = usd && new BigNumber(vote.probi).times(usd).dividedBy(scale).toFixed(2)
+      vote['processor USD'] = usd && new BigNumber(vote.fees).times(usd).dividedBy(scale).toFixed(2)
+      vote.probi = new BigNumber(vote.probi).truncated().toString()
+      vote.fees = new BigNumber(vote.fees).truncated().toString()
     })
   })
 
@@ -1402,9 +1402,10 @@ exports.workers = {
       const summaryP = payload.summary
       const owner = payload.owner
       const publisher = payload.publisher
+      const referrals = runtime.database.get('referrals', debug)
       const settlements = runtime.database.get('settlements', debug)
       const scale = new BigNumber(runtime.currency.alt2scale(altcurrency) || 1)
-      let data, data1, data2, file, entries, publishers, query, range, usd
+      let contributions, data, data1, data2, file, entries, publishers, query, range, referralTotals, usd
       let ending = payload.ending
 
       if ((starting) || (ending)) {
@@ -1425,30 +1426,70 @@ exports.workers = {
           entries.forEach((entry) => { query.$or.push({ publisher: entry.publisher }) })
           entries = await settlements.find(query)
         }
-        publishers = await mixer(debug, runtime, undefined, range, undefined)
-        underscore.keys(publishers).forEach((publisher) => {
-          if (underscore.where(entries, { publisher: publisher }).length === 0) delete publishers[publisher]
+        contributions = await mixer(debug, runtime, undefined, range)
+        underscore.keys(contributions).forEach((publisher) => {
+          if (underscore.where(entries, { publisher: publisher }).length === 0) delete contributions[publisher]
         })
+      }
+
+      referralTotals = await referrals.aggregate([
+        { $match: { owner: payload.owner } },
+        {
+          $group: {
+            _id: '$publisher',
+            count: { $sum: 1 },
+            probi: { $sum: '$probi' }
+          }
+        }
+      ])
+      referralTotals = referralTotals.reduce((obj, item) => {
+        item.publisher = item._id
+        item.probi = new BigNumber(item.probi.toString())
+        item.fees = item.probi.times(feePercent).truncated()
+        item.probi = item.probi.minus(item.fees)
+        item.altcurrency = altcurrency
+        item.note = 'Finalized referrals'
+
+        obj[item._id] = item
+        return obj
+      }, {})
+
+      publishers = underscore.keys(contributions)
+      if (payload.owner) {
+        publishers.push(...underscore.keys(referralTotals))
+        publishers = underscore.uniq(publishers)
       }
 
       usd = runtime.currency.alt2fiat(altcurrency, 1, 'USD', true) || new BigNumber(0)
       data = []
       data1 = { altcurrency: altcurrency, probi: new BigNumber(0), fees: new BigNumber(0) }
-      data2 = { altcurrency: altcurrency, probi: new BigNumber(0), fees: new BigNumber(0), subtotal: {} }
-      underscore.keys(publishers).sort(braveHapi.domainCompare).forEach((publisher) => {
+      data2 = { altcurrency: altcurrency, probi: new BigNumber(0), fees: new BigNumber(0) }
+
+      publishers.sort(braveHapi.domainCompare).forEach((publisher) => {
         const entry = {}
         let info
 
-        entry[publisher] = publishers[publisher]
-        info = publisherContributions(runtime, entry, undefined, undefined, undefined, 'csv', undefined, summaryP, undefined,
-                                      usd)
-        info.data.forEach((datum) => {
-          datum.probi = datum.probi.toString()
-          datum.fees = datum.fees.toString()
-        })
-        data = data.concat(info.data)
-        data1.probi = data1.probi.plus(info.probi)
-        data1.fees = data1.fees.plus(info.fees)
+        if (contributions[publisher]) {
+          entry[publisher] = contributions[publisher]
+          info = publisherContributions(runtime, entry, undefined, undefined, undefined, 'csv', undefined, summaryP, undefined,
+                                        usd)
+          info.data.forEach((datum) => {
+            datum.probi = datum.probi.toString()
+            datum.fees = datum.fees.toString()
+            datum.note = 'User contributions'
+          })
+          data = data.concat(info.data)
+          data1.probi = data1.probi.plus(info.probi)
+          data1.fees = data1.fees.plus(info.fees)
+        }
+        if (!summaryP) data.push([])
+
+        if (referralTotals[publisher]) {
+          info = referralTotals[publisher]
+          data.push(info)
+          data1.probi = data1.probi.plus(info.probi)
+          data1.fees = data1.fees.plus(info.fees)
+        }
         if (!summaryP) data.push([])
 
         info = publisherSettlements(runtime, underscore.where(entries, { publisher: publisher }), 'csv', summaryP)
@@ -1459,6 +1500,9 @@ exports.workers = {
           datum.probi = datum.probi.toString()
           datum.fees = datum.fees.toString()
           datum.amount = datum.amount.toString()
+          if (datum.type) {
+            datum.note = datum.type[0].toUpperCase() + datum.type.substr(1) + ' payout'
+          }
         })
         data = data.concat(info.data)
         data2.probi = data2.probi.plus(info.probi)
@@ -1472,7 +1516,7 @@ exports.workers = {
       })
       if ((!publisher) && ((!owner) || (underscore.size(publishers) > 1))) {
         data.push({
-          publisher: 'TOTAL',
+          note: 'ACTIVITY',
           altcurrency: data1.altcurrency,
           probi: data1.probi.toString(),
           fees: data1.fees.toString(),
@@ -1481,7 +1525,7 @@ exports.workers = {
         })
         if ((!summaryP) && (!owner)) data.push([])
         data.push({
-          publisher: 'TOTAL',
+          note: 'TOTAL PAID OUT',
           altcurrency: data2.altcurrency,
           probi: data2.probi.toString(),
           fees: data2.fees.toString()
@@ -1500,8 +1544,8 @@ exports.workers = {
         let fields = []
         let fieldNames = []
 
-        fields.push('timestamp', 'publisher')
-        fieldNames.push('timestamp', 'publisher')
+        fields.push('note', 'timestamp', 'publisher')
+        fieldNames.push('note', 'timestamp', 'publisher')
         if (!owner) {
           fields.push('publisher USD', 'processor USD')
           fieldNames.push('estimated USD', 'estimated fees')
