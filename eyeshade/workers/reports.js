@@ -1016,14 +1016,30 @@ const referralStatement = async (debug, runtime, owner, summaryP) => {
 const findEligPublishers = async (debug, runtime, publishers) => {
   const publishersC = runtime.database.get('publishers', debug)
 
-  if (!publishers || publishers.length === 0) {
-    return []
+  const query = { verified: true }
+
+  if (Array.isArray(publishers)) {
+    if (publishers.length === 0) {
+      return []
+    }
+    query.$or = publishers.map((pub) => { return { publisher: pub } })
+  } else if (typeof publishers !== 'undefined') {
+    throw new Error('Only an array of publisher names or undefined are allowed for argument publishers')
   }
 
-  const entries = await publishersC.find({ $or: publishers.map((pub) => { return { publisher: pub } }),
-    authorized: true,
-    verified: true }, { publisher: 1 })
-  return underscore.map(entries, (entry) => { return entry.publisher })
+  return publishersC.aggregate([
+    { $match: query },
+    {
+      $lookup:
+      {
+        from: 'owners',
+        localField: 'owner',
+        foreignField: 'owner',
+        as: 'ownerdata'
+      }
+    },
+    { $match: { 'ownerdata.authorized': true } }
+  ])
 }
 
 /**
@@ -1032,9 +1048,6 @@ const findEligPublishers = async (debug, runtime, publishers) => {
  * by our payment tooling
  **/
 const prepareReferralPayout = async (debug, runtime, authority, reportId, thresholdProbi) => {
-  const owners = runtime.database.get('owners', debug)
-  const publishers = runtime.database.get('publishers', debug)
-
   const statements = await referralStatement(debug, runtime, undefined, true)
   const threshPubs = underscore.filter(underscore.keys(statements), (publisher) => {
     return statements[publisher].balance.probi.greaterThan(thresholdProbi)
@@ -1043,17 +1056,16 @@ const prepareReferralPayout = async (debug, runtime, authority, reportId, thresh
 
   const payments = []
   for (let i = 0; i < eligPublishers.length; i++) {
-    const payment = statements[eligPublishers[i]].balance
+    const payment = statements[eligPublishers[i].publisher].balance
     payment.type = 'referral'
     payment.fees = payment.probi.times(feePercent).truncated()
     payment.probi = payment.probi.minus(payment.fees)
     payment.authority = authority
     payment.transactionId = reportId
 
-    const publisher = await publishers.findOne({ publisher: payment.publisher })
-    payment.owner = publisher.owner
+    payment.owner = eligPublishers[i].owner
 
-    const entry = await owners.findOne({ owner: payment.owner })
+    const entry = eligPublishers[i].ownerdata
     if ((!entry) || (!entry.provider) || (!entry.parameters)) {
       await notification(debug, runtime, payment.owner, payment.publisher, { type: 'verified_no_wallet' })
       continue
@@ -1171,7 +1183,6 @@ exports.workers = {
       const owners = runtime.database.get('owners', debug)
       const publishersC = runtime.database.get('publishers', debug)
       const settlements = runtime.database.get('settlements', debug)
-      const tokens = runtime.database.get('tokens', debug)
       const scale = new BigNumber(runtime.currency.alt2scale(altcurrency) || 1)
       let data, entries, file, info, previous, publishers, usd
 
@@ -1181,15 +1192,12 @@ exports.workers = {
         publishers[publisher].authorized = false
         publishers[publisher].verified = false
       })
-      entries = await publishersC.find({ authorized: true })
+
+      entries = await findEligPublishers(debug, runtime, undefined)
       entries.forEach((entry) => {
         if (typeof publishers[entry.publisher] === 'undefined') return
-
-        underscore.extend(publishers[entry.publisher], underscore.pick(entry, [ 'authorized', 'altcurrency', 'provider' ]))
-      })
-      entries = await tokens.find({ verified: true })
-      entries.forEach((entry) => {
-        if (typeof publishers[entry.publisher] !== 'undefined') publishers[entry.publisher].verified = true
+        publishers[entry.publisher].authorized = true
+        publishers[entry.publisher].verified = true
       })
 
       if (balanceP) {
@@ -1399,11 +1407,12 @@ exports.workers = {
       const authority = payload.authority
       const rollupP = payload.rollup
       const starting = payload.starting
-      const summaryP = payload.summary
       const owner = payload.owner
       const publisher = payload.publisher
+      const publishersC = runtime.database.get('publishers', debug)
       const referrals = runtime.database.get('referrals', debug)
       const settlements = runtime.database.get('settlements', debug)
+      const summaryP = payload.summary
       const scale = new BigNumber(runtime.currency.alt2scale(altcurrency) || 1)
       let contributions, data, data1, data2, file, entries, publishers, query, range, referralTotals, usd
       let ending = payload.ending
@@ -1426,10 +1435,12 @@ exports.workers = {
           entries.forEach((entry) => { query.$or.push({ publisher: entry.publisher }) })
           entries = await settlements.find(query)
         }
-        contributions = await mixer(debug, runtime, undefined, range)
-        underscore.keys(contributions).forEach((publisher) => {
-          if (underscore.where(entries, { publisher: publisher }).length === 0) delete contributions[publisher]
-        })
+        if (payload.owner) {
+          publishers = await publishersC.find({ owner: payload.owner })
+          contributions = await mixer(debug, runtime, publishers.map((p) => p.publisher), range)
+        } else {
+          contributions = await mixer(debug, runtime, undefined, range)
+        }
       }
 
       referralTotals = await referrals.aggregate([

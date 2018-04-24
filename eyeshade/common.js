@@ -5,7 +5,12 @@ const braveHapi = require('../bat-utils').extras.hapi
 const publish = async (debug, runtime, method, owner, publisher, endpoint, payload) => {
   let path, result
 
-  if (!runtime.config.publishers) throw new Error('no configuration for publishers server')
+  if (!runtime.config.publishers) {
+    if (process.env.NODE_ENV === 'production') {
+      throw new Error('no configuration for publishers server')
+    }
+    return {}
+  }
 
   path = '/api'
   if (owner) {
