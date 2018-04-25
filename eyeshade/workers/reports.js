@@ -1090,6 +1090,33 @@ const prepareReferralPayout = async (debug, runtime, authority, reportId, thresh
   return payments
 }
 
+const reasonCode = (debug, runtime, reason) => {
+  const codeRE = /Response Error: ([1-5][0-9][0-9])/
+  const reasons = [
+    { code: 1, contains: 'timeout' },
+    { code: 1, contains: 'Time-out' },
+    { code: 2, contains: 'ECONNREFUSED' },
+    { code: 3, contains: 'redirections' },
+    { code: 4, contains: 'Hostname/IP doesn\'t match certificate\'s altnames' },
+    { code: 5, contains: 'certificate' },
+    { code: 6, contains: 'socket hang up' },
+    { code: 7, contains: 'TypeError' },
+    { code: 8, contains: 'ENOTFOUND' },
+    { code: 9, contains: 'EPROTO' }
+  ]
+  let match
+
+  if ((!reason) || (reason.indexOf('Error:') === -1)) return 0
+
+  for (let entry of reasons) { if ((entry.contains) && (reason.indexOf(entry.contains) !== -1)) return entry.code }
+
+  match = codeRE.exec(reason)
+  if (match) return parseInt(match[1], 10)
+
+  runtime.notify(debug, { channel: '#collector-bot', text: 'unknown reason: ' + reason })
+  return 999
+}
+
 exports.initialize = async (debug, runtime) => {
   altcurrency = runtime.config.altcurrency || 'BAT'
 
@@ -1154,6 +1181,7 @@ exports.workers = {
     , message          :
       { reportId       : '...'
       , reportURL      : '...'
+      , analysis       :  true  | false
       , authorized     :  true  | false | undefined
       , authority      : '...:...'
       , format         : 'json' | 'csv'
@@ -1170,6 +1198,7 @@ exports.workers = {
  */
   'report-publishers-contributions':
     async (debug, runtime, payload) => {
+      const analysisP = payload.analysis
       const authority = payload.authority
       const authorized = payload.authorized
       const cohorts = payload.cohorts || []
@@ -1181,10 +1210,12 @@ exports.workers = {
       const threshold = payload.threshold || 0
       const verified = payload.verified
       const owners = runtime.database.get('owners', debug)
+      const pseries = runtime.database.get('pseries', debug)
       const publishersC = runtime.database.get('publishers', debug)
       const settlements = runtime.database.get('settlements', debug)
+      const voting = runtime.database.get('voting', debug)
       const scale = new BigNumber(runtime.currency.alt2scale(altcurrency) || 1)
-      let data, entries, file, info, previous, publishers, usd
+      let cohortz, data, entries, fields, file, info, previous, publishers, query, results, usd
 
       publishers = await mixer(debug, runtime, [ publisher ], undefined, cohorts)
 
@@ -1237,6 +1268,98 @@ exports.workers = {
       info = publisherContributions(runtime, publishers, authority, authorized, verified, format, reportId, summaryP,
                                     threshold, usd)
       data = info.data
+
+      if (analysisP) {
+        results = []
+
+        query = {}
+        if ((typeof authorized !== 'undefined') || (typeof verified !== 'undefined') || (threshold > 0)) {
+          query.$or = []
+          for (let datum of data) { query.$or.push({ publisher: datum.publisher }) }
+        }
+        entries = await voting.aggregate([
+          {
+            $match: query
+          },
+          {
+            $group: {
+              _id: { publisher: '$publisher', cohort: '$cohort' },
+              counts: { $sum: '$counts' }
+            }
+          },
+          {
+            $project: {
+              _id: 1,
+              counts: 1
+            }
+          }
+        ])
+
+        cohortz = [ 'control', 'grant' ]
+        for (let entry of entries) {
+          const cohort = entry._id.cohort
+
+          if ((cohort) && (cohortz.indexOf(cohort) === -1)) cohortz.push(cohort)
+        }
+
+        for (let datum of data) {
+          const notAsciiRE = /[^\x20-\x7F]+/
+          let didP, plist
+
+          datum.control = datum.grant = 0
+          for (let entry of entries) {
+            if (entry._id.publisher === datum.publisher) datum[entry._id.cohort || 'control'] = entry.counts
+          }
+
+          plist = await pseries.find({ publisher: datum.publisher })
+          for (let entry of plist) {
+            entry.timestamp = dateformat((entry.timestamp.high_ * 1000) +
+                                         (entry.timestamp.low_ / bson.Timestamp.TWO_PWR_32_DBL_),
+                                         datefmt)
+          }
+          plist = plist.sort((a, b) => { return (b.timestamp - a.timestamp) })
+
+          for (let entry of plist) {
+            let params, props
+
+            params = { timestamp: entry.timestamp, reason: reasonCode(debug, runtime, entry.reason) }
+
+            if (entry.site) {
+              underscore.extend(params, { modified: '' }, underscore.omit(entry.site, [ 'publisher' ]))
+            } else {
+              underscore.extend(params, { created: '' }, entry.snippet || {}, entry.statistics || {})
+              props = getPublisherProps(datum.publisher)
+              if (props) params.url = props.URL
+            }
+
+            props = [ 'title', 'softTitle', 'description', 'text' ]
+            props.forEach((prop) => {
+              let value = params[prop]
+
+              if (value) value = value.length
+              params[prop + '.length'] = value || 0
+              params[prop + '.ascii'] = value && !notAsciiRE.test(params[prop]) ? 1 : 0
+            })
+
+            props = [ 'created', 'modified' ]
+            props.forEach((prop) => {
+              const value = params[prop]
+
+              if (!value) return
+
+              delete params[prop]
+              params.epoch = dateformat((value.high_ * 1000) + (value.low_ / bson.Timestamp.TWO_PWR_32_DBL_), datefmt)
+            })
+
+            if (didP) results.push(underscore.extend({ publisher: datum.publisher }, params))
+            else didP = results.push(underscore.extend(datum, params))
+          }
+
+          if (!didP) results.push(datum)
+        }
+
+        data = results
+      }
 
       file = await create(runtime, 'publishers-', payload)
       if (format === 'json') {
@@ -1309,8 +1432,28 @@ exports.workers = {
         })
       }
 
-      try { await file.write(utf8ify(json2csv({ data: await labelize(debug, runtime, data) })), true) } catch (ex) {
+      fields = [
+        'publisher', 'altcurrency', 'probi', 'fees', 'publisher USD', 'processor USD', 'verified', 'authorized',
+        'timestamp'
+      ]
+      if (cohortz) {
+        fields = fields.concat(cohortz, [
+          'epoch',
+          'title.length', 'title.ascii',
+          'softTitle.length', 'softTitle.ascii',
+          'description.length', 'description.ascii',
+          'text.length', 'text.ascii',
+          'url',
+          'comments', 'subscribers', 'videos', 'country',
+          'reason'
+        ])
+      }
+
+      try {
+        await file.write(utf8ify(json2csv({ data: await labelize(debug, runtime, data), fields: fields })), true)
+      } catch (ex) {
         debug('reports', { report: 'report-publishers-contributions', reason: ex.toString() })
+        console.log(ex.stack)
         file.close()
       }
       runtime.notify(debug, { channel: '#publishers-bot', text: authority + ' report-publishers-contributions completed' })

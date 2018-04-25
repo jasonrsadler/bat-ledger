@@ -112,6 +112,36 @@ exports.initialize = async (debug, runtime) => {
     },
 
     {
+      category: runtime.database.get('pseries', debug),
+      name: 'pseries',
+      property: 'tsId',
+      empty: {
+        publisher: '',
+        tsId: bson.ObjectID.createFromTime(0),
+
+        providerName: '',
+        providerSuffix: '',
+        providerValue: '',
+
+        // websites
+        site: {},
+
+        // video channels
+        snippet: {},
+        statistics: {},
+
+        // reason for failure
+        reason: '',
+
+        timestamp: bson.Timestamp.ZERO
+      },
+      unique: [ { tsId: 1 } ],
+      others: [ { providerName: 1 }, { providerSuffix: 1 }, { providerValue: 1 },
+                { views: 1 }, { comments: 1 }, { subscribers: 1 }, { videos: 1 },
+                { timestamp: 1 } ]
+    },
+
+    {
       category: runtime.database.get('publishers', debug),
       name: 'publishers',
       property: 'publisher',

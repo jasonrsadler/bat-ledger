@@ -158,6 +158,7 @@ v1.publisher.contributions = {
     params: { publisher: braveJoi.string().publisher().required().description('the publisher identity') },
     query: {
       format: Joi.string().valid('json', 'csv').optional().default('csv').description('the format of the report'),
+      analysis: Joi.boolean().default(true).description('return collector analysis (forces summary)'),
       summary: Joi.boolean().optional().default(true).description('summarize report')
     }
   },
@@ -225,6 +226,7 @@ v1.publishers.contributions = {
   validate: {
     query: {
       format: Joi.string().valid('json', 'csv').optional().default('csv').description('the format of the report'),
+      analysis: Joi.boolean().default(true).description('return collector analysis (forces summary && !balance)'),
       summary: Joi.boolean().optional().default(true).description('summarize report'),
       balance: Joi.boolean().optional().default(true).description('show balance due'),
       authorized: Joi.boolean().optional().description('filter on authorization status'),

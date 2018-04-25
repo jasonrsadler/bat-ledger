@@ -58,6 +58,13 @@ const services = {
         { currency              : process.env.REFERRALS_CURRENCY || 'USD'
         , amount                : process.env.REFERRALS_AMOUNT || 5
         }
+      module.exports.gather = { site: {} }
+      if (process.env.YOUTUBE_API_KEY) {
+        module.exports.gather.youtube =
+          { url                 : process.env.YOUTUBE_URL       || 'https://www.googleapis.com/youtube/v3/channels'
+          , api_key             : process.env.YOUTUBE_API_KEY
+          }
+      }
 
       helper()
       uphold()
