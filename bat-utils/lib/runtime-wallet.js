@@ -4,7 +4,6 @@ const UpholdSDK = require('@uphold/uphold-sdk-javascript')
 const bitcoinjs = require('bitcoinjs-lib')
 const crypto = require('crypto')
 const underscore = require('underscore')
-const uuid = require('uuid')
 const { verify } = require('http-request-signature')
 
 const braveHapi = require('./extras-hapi')
@@ -45,13 +44,20 @@ const Wallet = function (config, runtime) {
   }
 }
 
-Wallet.prototype.create = async function (requestType, request) {
+Wallet.prototype.addAddress = async function (info, altcoin) {
+  const f = Wallet.providers[info.provider].addAddress
+
+  if (!f) throw new Error('provider ' + info.provider + ' addAddress not supported')
+  return f.bind(this)(info, altcoin)
+}
+
+Wallet.prototype.create = async function (apiVersion, requestType, request) {
   let f = Wallet.providers.mock.create
   if (this.config.uphold) {
     f = Wallet.providers.uphold.create
   }
   if (!f) return {}
-  return f.bind(this)(requestType, request)
+  return f.bind(this)(apiVersion, requestType, request)
 }
 
 Wallet.prototype.balances = async function (info) {
@@ -236,36 +242,78 @@ Wallet.prototype.purchaseBAT = async function (info, amount, currency, language)
 Wallet.providers = {}
 
 Wallet.providers.uphold = {
-  create: async function (requestType, request) {
+  createAddress: async function (cardId, altcoin) {
+    const networks = {
+      BCH: 'bitcoin-cash',
+      BTC: 'bitcoin',
+      BTG: 'bitcoin-gold',
+      DASH: 'dash',
+      ETH: 'ethereum',
+      LTC: 'litecoin'
+    }
+    let addresses, cardInfo
+    let network = networks[altcoin]
+
+    if (!network) return ('unsupported altcoin: ' + altcoin)
+
+    if (this.runtime.config.currency.altcoins.indexOf(altcoin) === -1) return ('unconfigured altcoin: ' + altcoin)
+
+    cardInfo = await this.uphold.getCard(cardId)
+    addresses = (cardInfo && cardInfo.address) || {}
+    if (addresses[network]) return { id: addresses[network], network: network }
+
+    return this.uphold.createCardAddress(cardId, network)
+  },
+  addAddress: async function (info, altcoin) {
+    let result
+
+    try {
+      result = await Wallet.providers.uphold.createAddress.bind(this)(info.providerId, altcoin)
+      if (typeof result === 'string') return result
+
+      info.addresses[altcoin] = result.id
+    } catch (ex) {
+      debug('addAddress',
+            { provider: 'uphold', reason: ex.toString(), operation: '/me/cards/:id/addresses', altcoin: altcoin })
+      throw ex
+    }
+  },
+  create: async function (apiVersion, requestType, request) {
     if (requestType === 'httpSignature') {
       const altcurrency = request.body.currency
       if (altcurrency === 'BAT') {
-        let btcAddr, ethAddr, ltcAddr, wallet
+        const altcoins = [ 'ETH' ]
+        let addresses, result, wallet
 
+        if (apiVersion === 2) altcoins.push('BTC', 'LTC')
         try {
           wallet = await this.uphold.api('/me/cards', { body: request.octets, method: 'post', headers: request.headers })
-          ethAddr = await this.uphold.createCardAddress(wallet.id, 'ethereum')
-          btcAddr = await this.uphold.createCardAddress(wallet.id, 'bitcoin')
-          ltcAddr = await this.uphold.createCardAddress(wallet.id, 'litecoin')
+          addresses = { CARD_ID: wallet.id }
+          for (let altcoin of altcoins) {
+            result = await Wallet.providers.uphold.createAddress.bind(this)(wallet.id, altcoin)
+            if (typeof result === 'string') throw new Error(result)
+
+            addresses[altcoin] = result.id
+          }
         } catch (ex) {
           debug('create', {
             provider: 'uphold',
             reason: ex.toString(),
-            operation: btcAddr ? 'litecoin' : ethAddr ? 'bitcoin' : wallet ? 'ethereum' : '/me/cards'
+            operation: wallet ? '/me/cards' : '/me/cards/:id/addresses'
           })
           throw ex
         }
-        return { 'wallet': { 'addresses': {
-          'BAT': ethAddr.id,
-          'BTC': btcAddr.id,
-          'CARD_ID': wallet.id,
-          'ETH': ethAddr.id,
-          'LTC': ltcAddr.id
-        },
-          'provider': 'uphold',
-          'providerId': wallet.id,
-          'httpSigningPubKey': request.body.publicKey,
-          'altcurrency': 'BAT' } }
+        addresses.BAT = addresses.ETH
+
+        return {
+          wallet: {
+            addresses: addresses,
+            provider: 'uphold',
+            providerId: wallet.id,
+            httpSigningPubKey: request.body.publicKey,
+            altcurrency: 'BAT'
+          }
+        }
       } else {
         throw new Error('wallet uphold create requestType ' + requestType + ' not supported for altcurrency ' + altcurrency)
       }
@@ -500,121 +548,5 @@ Wallet.providers.mock = {
   }
 }
 Wallet.providers.mockHttpSignature = Wallet.providers.mock
-
-Wallet.providers.simplex = {
-  purchaseBAT: async function (info, amount, currency, language) {
-    const fiat = 'USD'
-    const now = underscore.now()
-    const params = {
-      currency: 'XBT',
-      partner: 'brave',
-      version: '1'
-    }
-    const min = this.runtime.config.simplex && (this.runtime.config.simplex['MIN_' + fiat.toUpperCase()] || 5)
-    let expires, quote, rate, result
-
-    if (!this.runtime.config.simplex) return
-
-    if (!this.currency.fiatP(currency)) {
-      rate = underscore.pick(this.currency.rates[currency] || {}, fiat)
-      if (!rate) return
-
-      amount = Math.ceil(this.currency.alt2fiat(currency, amount, fiat, true))
-    } else if (currency !== fiat) {
-      rate = underscore.pick(this.currency.fxrates[currency])
-      if (!rate) return
-
-      amount = Math.ceil(amount / rate)
-    }
-    currency = fiat
-    if (amount < min) amount = min
-
-    quote = info.simplex
-    if ((!quote) || (quote.expires <= now)) {
-      result = await braveHapi.wreck.post(this.runtime.config.simplex.url + '/wallet/merchant/v2/quote', {
-        headers: {
-          accept: 'application/json',
-          authorization: 'ApiKey ' + this.runtime.config.simplex.api_key,
-          'content-type': 'application/json'
-        },
-        payload: JSON.stringify({
-          end_user_id: quote ? quote.user_id : uuid.v4().toLowerCase(),
-          digital_currency: params.currency,
-          fiat_currency: currency,
-          requested_currency: currency,
-          requested_amount: amount,
-          wallet_id: params.partner
-        })
-      })
-      if (Buffer.isBuffer(result)) try { result = JSON.parse(result) } catch (ex) { result = result.toString() }
-
-      expires = new Date(result.valid_until).getTime()
-      if ((isNaN(expires)) || (!result.quote_id)) return
-
-      quote = underscore.extend(result, { expires: expires })
-    }
-    quote.payment_id = uuid.v4().toLowerCase()
-
-    result = await braveHapi.wreck.post(this.runtime.config.simplex.url + '/wallet/merchant/v1/payments/partner/data', {
-      headers: {
-        accept: 'application/json',
-        authorization: 'ApiKey ' + this.runtime.config.simplex.api_key,
-        'content-type': 'application/json'
-      },
-      payload: JSON.stringify({
-        account_details: {
-          app_provider_id: params.partner,
-          app_version_id: params.version,
-          app_end_user_id: quote.user_id,
-          signup_login: {
-            ip: '213.162.55.5',
-            accept_language: language,
-            http_accept_language: language,
-            timestamp: new Date(now).toISOString()
-          }
-        },
-        transaction_details: {
-          payment_details: {
-            quote_id: quote.quote_id,
-            payment_id: quote.payment_id,
-            order_id: uuid.v4().toLowerCase(),
-            fiat_total_amount: {
-              currency: quote.fiat_money.currency,
-              amount: quote.fiat_money.total_amount
-            },
-            requested_digital_amount: quote.digital_money,
-            destination_wallet: {
-              currency: params.currency,
-              address: info.addresses.BTC
-            }
-          }
-        }
-      })
-    })
-    if (Buffer.isBuffer(result)) try { result = JSON.parse(result) } catch (ex) { result = result.toString() }
-
-    return ({
-      quotes: { simplex: quote },
-      buyForm: {
-        method: 'POST',
-        action: this.runtime.config.simplex.url + '/payments/new',
-        version: params.version,
-        partner: params.partner,
-        payment_flow_type: 'wallet',
-        return_url: 'about:preferences#payments',
-        quote_id: quote.quote_id,
-        payment_id: quote.payment_id,
-        user_id: quote.user_id,
-        'destination_wallet[address]': info.addresses.BTC,
-        'destination_wallet[currency]': params.currency,
-        'fiat_total_amount[amount]': quote.fiat_money.base_amount,
-        'fiat_total_amount[currency]': quote.fiat_money.currency,
-        explicit_fee: 'true',
-        'digital_total_amount[amount]': quote.digital_money.amount,
-        'digital_total_amount[currency]': quote.digital_money.currency
-      }
-    })
-  }
-}
 
 module.exports = Wallet
