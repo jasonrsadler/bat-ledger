@@ -25,6 +25,7 @@ const server = (request, runtime) => {
 /*
    GET /v1/registrar/{registrarType}
    GET /v2/registrar/{registrarType}
+   GET /v3/registrar/{registrarType}
  */
 
 v2.read =
@@ -45,7 +46,7 @@ v2.read =
   validate:
   { params: {
     registrarType: Joi.string().valid('persona', 'viewing').required().description('the type of the registrar'),
-    apiV: Joi.string().valid('v1', 'v2').required().description('the api version')
+    apiV: Joi.string().valid('v1', 'v2', 'v3').required().description('the api version')
   } },
 
   response: {
