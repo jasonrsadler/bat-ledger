@@ -355,12 +355,16 @@ const monitor3 = (config, runtime) => {
 
   config.altcoins.forEach((altcoin) => {
     const possibles = {
+/* handled by monitor1
       BCH: [ 'BTC', 'ETH', 'USD' ],
       BTC: [ 'EUR', 'USD' ],
+ */
       BTG: [ 'BTC', 'USD' ],
       DASH: [ 'BTC', 'USD' ],
+/* handled by monitor1
       ETH: [ 'BTC', 'USD' ],
       LTC: [ 'BTC', 'USD' ]
+ */
     }
 
     if (!possibles[altcoin]) return
@@ -720,6 +724,8 @@ Currency.prototype.decimals = {
   BAT: 18,
   BCH: 8,
   BTC: 8,
+  BTG: 8,
+  DASH: 8,
   ETC: 18,
   ETH: 18,
   LTC: 8,
