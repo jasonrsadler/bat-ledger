@@ -360,7 +360,7 @@ const monitor3 = (config, runtime) => {
       BTC: [ 'EUR', 'USD' ],
  */
       BTG: [ 'BTC', 'USD' ],
-      DASH: [ 'BTC', 'USD' ],
+      DASH: [ 'BTC', 'USD' ]
 /* handled by monitor1
       ETH: [ 'BTC', 'USD' ],
       LTC: [ 'BTC', 'USD' ]
