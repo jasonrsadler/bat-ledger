@@ -221,6 +221,10 @@ const altcoins = {
     f: async (tickers, config, runtime) => {
       return altcoins._internal.f('LTC', tickers, config, runtime)
     }
+  },
+
+  XRP: {
+    id: 'ripple'
   }
 }
 
@@ -357,7 +361,7 @@ const monitor3 = (config, runtime) => {
     const possibles = {
 /* handled by monitor1
       BCH: [ 'BTC', 'ETH', 'USD' ],
-      BTC: [ 'EUR', 'USD' ],
+      BTC: [ 'EUR', 'USD', 'XRP' ],
  */
       BTG: [ 'BTC', 'USD' ],
       DASH: [ 'BTC', 'USD' ]
@@ -732,6 +736,7 @@ Currency.prototype.decimals = {
   NMC: 8,
   PPC: 6,
   XPM: 8,
+  XRP: 6,
   ZEC: 8
 }
 

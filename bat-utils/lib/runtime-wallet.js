@@ -250,6 +250,9 @@ Wallet.providers.uphold = {
       DASH: 'dash',
       ETH: 'ethereum',
       LTC: 'litecoin'
+/* soon!
+      XRP: 'ripple'
+ */
     }
     let addresses, cardInfo
     let network = networks[altcoin]
